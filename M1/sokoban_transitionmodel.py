@@ -25,14 +25,14 @@ class Trasnitionmodel:
         """
         successors = []
         
-        for action_name, (dx, dy) in self.actions.items():
-            new_agent_pos = (state.agent_pos[0] + dx, state.agent_pos[1] + dy)
+        for action_name, (dr, dc) in self.actions.items():
+            new_agent_pos = (state.agent_pos[0] + dr, state.agent_pos[1] + dc)
             # Trường hợp 1: Agent đi vào tường -> Không hợp lệ
             if new_agent_pos in self.walls:
                 continue
             # Trường hợp 2: Agent đẩy vào một box
             if new_agent_pos in state.boxes:
-                new_box_pos = (new_agent_pos[0] + dx, new_agent_pos[1] + dy)
+                new_box_pos = (new_agent_pos[0] + dr, new_agent_pos[1] + dc)
                 
                 # Nếu đằng sau box là tường HOẶC là một box khác -> Không đẩy được
                 if new_box_pos in self.walls or new_box_pos in state.boxes:

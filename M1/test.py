@@ -18,7 +18,7 @@ if __name__ == "__main__":
         print(f" - Neu di {action} -> Vi tri Agent moi: {next_state.agent_pos}")
     print("\n=== TEST TUẦN 2: 2 TÁC TỬ ĐỒNG THỜI ===")
     initial_a = map_data.initial_agent
-    initial_b = (initial_a[0] + 1, initial_a[1]) # Tạm xếp B đứng ngay cạnh A
+    initial_b = (initial_a[1], initial_a[0] + 1) # Tạm xếp B đứng ngay cạnh A
     
     # Khởi tạo engine 2 tác tử với giới hạn 50 bước
     problem_2 = TwoAgentProblem(map_data, initial_a, initial_b, n_steps=50)

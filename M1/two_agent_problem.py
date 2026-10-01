@@ -21,12 +21,12 @@ class TwoAgentProblem:
 
     def get_next_pos(self, current_pos, action):
         # Viết if-elif tường minh thay vì dùng dictionary .get()
-        x, y = current_pos
-        if action == 'North': return (x, y - 1)
-        elif action == 'South': return (x, y + 1)
-        elif action == 'East': return (x + 1, y)
-        elif action == 'West': return (x - 1, y)
-        return (x, y) # action = 'Wait' thì trả về chỗ cũ
+        r, c = current_pos
+        if action == 'North': return (r, c - 1)
+        elif action == 'South': return (r, c + 1)
+        elif action == 'East': return (r + 1, c)
+        elif action == 'West': return (r - 1, c)
+        return (r, c) # action = 'Wait' thì trả về chỗ cũ
 
     def transition_model(self, state, action_a, action_b):
         if self.is_terminal(state):
