@@ -22,7 +22,7 @@ class TwoAgentProblem:
 
     def get_next_pos(self, current_pos, action):
         # Viết if-elif tường minh thay vì dùng dictionary .get()
-        col, row = current_pos
+        row, col = current_pos
         if action == 'North': return ( col,row-1 )
         elif action == 'South': return ( col,row+1)
         elif action == 'East': return (col+1,row  )
