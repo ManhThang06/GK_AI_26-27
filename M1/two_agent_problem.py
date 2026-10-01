@@ -22,11 +22,11 @@ class TwoAgentProblem:
 
     def get_next_pos(self, current_pos, action):
         # Viết if-elif tường minh thay vì dùng dictionary .get()
-        row, col = current_pos
-        if action == 'North': return (row, col - 1)
-        elif action == 'South': return (row, col + 1)
-        elif action == 'East': return (row + 1, col)
-        elif action == 'West': return (row - 1, col)
+        col, row = current_pos
+        if action == 'North': return ( col,row-1 )
+        elif action == 'South': return ( col,row+1)
+        elif action == 'East': return (col+1,row  )
+        elif action == 'West': return (col-1,row  )
         return (row, col) # action = 'Wait' thì trả về chỗ cũ
 
     def transition_model(self, state, action_a, action_b):
@@ -59,9 +59,9 @@ class TwoAgentProblem:
             next_a = state.agent_a_pos # Đụng tường thì đứng im
         elif next_a in new_boxes:
             # Vị trí mới của hộp = Vị trí dự kiến của A + Vector hướng đi
-            box_next_r = next_a[0] + (next_a[0] - state.agent_a_pos[0])
-            box_next_c = next_a[1] + (next_a[1] - state.agent_a_pos[1])
-            box_next = (box_next_r, box_next_c)
+            box_next_c = next_a[0] + (next_a[0] - state.agent_a_pos[0])
+            box_next_r = next_a[1] + (next_a[1] - state.agent_a_pos[1])
+            box_next = (box_next_c, box_next_r)
 
             # Hộp đụng tường, đụng hộp khác, hoặc đụng thằng B đang đứng/định đi tới
             if box_next in self.walls or box_next in new_boxes or box_next == next_b:
@@ -78,9 +78,9 @@ class TwoAgentProblem:
         if next_b in self.walls:
             next_b = state.agent_b_pos
         elif next_b in new_boxes:
-            box_next_r = next_b[0] + (next_b[0] - state.agent_b_pos[0])
-            box_next_c = next_b[1] + (next_b[1] - state.agent_b_pos[1])
-            box_next = (box_next_r, box_next_c)
+            box_next_c = next_b[0] + (next_b[0] - state.agent_b_pos[0])
+            box_next_r = next_b[1] + (next_b[1] - state.agent_b_pos[1])
+            box_next = (box_next_c, box_next_r)
 
             # Chú ý: So sánh với next_a xem có đụng thằng A không
             if box_next in self.walls or box_next in new_boxes or box_next == next_a:

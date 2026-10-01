@@ -8,10 +8,10 @@ class MapParser:
     def _parse(self, filepath):
         with open(filepath, 'r') as f:
             lines = f.readlines()
-        for col, line in enumerate(lines):
+        for row, line in enumerate(lines):
             # Cắt ký tự xuống dòng để tránh lỗi
-            for row, char in enumerate(line.strip('\n')):
-                pos = (row, col)
+            for col, char in enumerate(line.strip('\n')):
+                pos = (col, row)
                 if char == '%':
                     self.walls.add(pos)
                 elif char == 'D':
