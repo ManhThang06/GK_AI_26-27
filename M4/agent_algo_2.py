@@ -1,5 +1,4 @@
 import time
-import itertools
 import heapq
 
 class AgentAlgorithm2:

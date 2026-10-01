@@ -29,13 +29,7 @@ class TwoAgentBoardView:
         for row in range(self.n_rows):
             for col in range(self.n_cols):
                 pos = (row, col)
-                rect = pygame.Rect(
-                    col * CELL_SIZE,
-                    self.top_offset + row * CELL_SIZE,
-                    CELL_SIZE,
-                    CELL_SIZE
-                )
-
+                rect = pygame.Rect(col * CELL_SIZE, self.top_offset + row * CELL_SIZE, CELL_SIZE, CELL_SIZE)
                 if pos in self.problem.walls:
                     pygame.draw.rect(screen, WALL, rect)
                 else:
@@ -52,22 +46,12 @@ class TwoAgentBoardView:
                 color = BOX_A
             elif owner == "B":
                 color = BOX_B
-
-            rect = pygame.Rect(
-                col * CELL_SIZE,
-                self.top_offset + row * CELL_SIZE,
-                CELL_SIZE,
-                CELL_SIZE
-            )
+            rect = pygame.Rect(col * CELL_SIZE, self.top_offset + row * CELL_SIZE, CELL_SIZE, CELL_SIZE)
             pygame.draw.rect(screen, color, rect.inflate(-8, -8))
-
         self._agent(screen, state.agent_a_pos, AGENT_A)
         self._agent(screen, state.agent_b_pos, AGENT_B)
 
     def _agent(self, screen, pos, color):
         row, col = pos
-        center = (
-            col * CELL_SIZE + CELL_SIZE // 2,
-            self.top_offset + row * CELL_SIZE + CELL_SIZE // 2
-        )
+        center = (col * CELL_SIZE + CELL_SIZE // 2, self.top_offset + row * CELL_SIZE + CELL_SIZE // 2)
         pygame.draw.circle(screen, color, center, CELL_SIZE // 2 - 6)

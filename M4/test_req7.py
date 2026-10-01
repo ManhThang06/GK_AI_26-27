@@ -1,3 +1,4 @@
+import importlib.util
 import os
 import sys
 import time
@@ -13,22 +14,26 @@ from two_agent_problem import TwoAgentProblem
 from agent_algo_1 import AgentAlgorithm1
 from agent_algo_2 import AgentAlgorithm2
 
-class DemoHeuristic:
-    def evaluate(self, boxes):
-        return len(boxes)
+def load_req2_heuristic(map_file, goals):
+    module_path = os.path.join(ROOT, "M2", "ucs&a_.py")
+    spec = importlib.util.spec_from_file_location("req2_ucs_astar", module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with open(map_file, "r") as f:
+        board_matrix = [list(line.rstrip("\n")) for line in f]
+    return module.SokobanHeuristic(board_matrix, goals)
 
 def main():
-    map_data = MapParser(os.path.join(ROOT, "M1", "example_map.txt"))
+    map_file = os.path.join(ROOT, "M1", "example_map.txt")
+    map_data = MapParser(map_file)
     initial_a = map_data.initial_agent
     initial_b = (initial_a[0], initial_a[1] + 1)
     problem = TwoAgentProblem(map_data, initial_a, initial_b, 50)
     state = problem.initial_state
+    heuristic = load_req2_heuristic(map_file, problem.goals)
 
     valid = {"North", "South", "West", "East", "Wait"}
-    agents = [
-        AgentAlgorithm1(DemoHeuristic(), 1.0),
-        AgentAlgorithm2(DemoHeuristic(), 1.0)
-    ]
+    agents = [AgentAlgorithm1(heuristic, 0.90), AgentAlgorithm2(heuristic, 0.90)]
 
     for number, agent in enumerate(agents, start=1):
         start = time.perf_counter()
