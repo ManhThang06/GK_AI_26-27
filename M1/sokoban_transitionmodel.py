@@ -8,10 +8,10 @@ class Trasnitionmodel:
         
         # Actions = {N, E, W, S}
         self.actions = {
-            'North': (0, -1),
-            'South': (0, 1),
-            'East':  (1, 0),
-            'West':  (-1, 0)
+            'N_Len': (0, -1),
+            'S_Xuong': (0, 1),
+            'E_Phai':  (1, 0),
+            'W_Trai':  (-1, 0)
         }
 
     def goal_test(self, state):
