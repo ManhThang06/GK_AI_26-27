@@ -20,9 +20,18 @@ def load_req2_heuristic(map_file, goals):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
-    with open(map_file, "r") as f:
-        board_matrix = [list(line.rstrip("\n")) for line in f]
+    with open(map_file, "r", encoding="utf-8") as f:
+        lines = [line.rstrip("\n\r") for line in f]
+    if not lines:
+        raise ValueError("Map rong.")
+    max_cols = max(len(line) for line in lines)
+    board_matrix = []
 
+    for line in lines:
+        row = list(line)
+        if len(row) < max_cols:
+            row.extend(["%"] * (max_cols - len(row)))
+        board_matrix.append(row)
     return module.SokobanHeuristic(board_matrix, goals)
 
 def main():
