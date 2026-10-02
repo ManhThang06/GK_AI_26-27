@@ -53,7 +53,8 @@ class TwoAgentCompetitiveApp:
         action_b = self.agent_b.choose_action(pre_state, self.problem)
         self.time_b_ms = (time.perf_counter() - start) * 1000
         self.state = self.problem.transition_model(pre_state, action_a, action_b)
-
+        if self.problem.is_terminal(self.state):
+            self.paused = True
     def text(self, value, x, y, size=24):
         font = pygame.font.Font(None, size)
         image = font.render(value, True, (30, 30, 30))
@@ -111,11 +112,30 @@ class TwoAgentCompetitiveApp:
 
         if self.paused:
             self.text("PAUSED", 560, 50, 22)
-        if self.problem.is_terminal(self.state):
-            self.text("GAME OVER", 560, 15, 22)
         self.board_surface.fill((255, 255, 255))
         self.view.draw(self.board_surface, self.state)
         self.screen.blit(self.board_surface, self.board_pos)
+        if self.problem.is_terminal(self.state):
+            self.paused = True
+            if self.state.score_a > self.state.score_b:
+                result = "AGENT A WINS!"
+            elif self.state.score_b > self.state.score_a:
+                result = "AGENT B WINS!"
+            else:
+                result = "DRAW!"
+            game_over_rect = pygame.Rect(0, 0, 300, 150)
+            game_over_rect.center = (self.width // 2, self.height // 2)
+            pygame.draw.rect(self.screen, (25, 25, 25), game_over_rect, border_radius=12)
+            game_over_image = self.font.render("GAME OVER", True, COLOR_STATUS)
+            game_over_text_rect = game_over_image.get_rect(
+                center=(game_over_rect.centerx, game_over_rect.centery - 30)
+            )
+            self.screen.blit(game_over_image, game_over_text_rect)
+            result_image = self.font.render(result, True, COLOR_STATUS)
+            result_rect = result_image.get_rect(
+                center=(game_over_rect.centerx, game_over_rect.centery + 20)
+            )
+            self.screen.blit(result_image, result_rect)
         pygame.display.flip()
 
     def events(self):
