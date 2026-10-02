@@ -11,7 +11,7 @@ class MapParser:
         for row, line in enumerate(lines):
             # Cắt ký tự xuống dòng để tránh lỗi
             for col, char in enumerate(line.strip('\n')):
-                pos = (col, row)
+                pos = (row, col)
                 if char == '%':
                     self.walls.add(pos)
                 elif char == 'D':
