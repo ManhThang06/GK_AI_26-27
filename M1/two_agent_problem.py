@@ -1,5 +1,4 @@
 from two_agent_state import TwoAgentState
-
 class TwoAgentProblem:
     def __init__(self, map_data, initial_a, initial_b, n_steps):
         self.walls = map_data.walls
@@ -13,7 +12,6 @@ class TwoAgentProblem:
             steps_left=n_steps,
             box_owner=None
         )
-
     def is_terminal(self, state):
         return state.steps_left <= 0
 
@@ -27,7 +25,7 @@ class TwoAgentProblem:
         elif action == 'South': return ( col,row+1)
         elif action == 'East': return (col+1,row  )
         elif action == 'West': return (col-1,row  )
-        return (row, col) # action = 'Wait' thì trả về chỗ cũ
+        return (col, row) # action = 'Wait' thì trả về chỗ cũ
 
     def transition_model(self, state, action_a, action_b):
         if self.is_terminal(state):
