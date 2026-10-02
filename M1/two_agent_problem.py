@@ -59,7 +59,7 @@ class TwoAgentProblem:
             # Vị trí mới của hộp = Vị trí dự kiến của A + Vector hướng đi
             box_next_r = next_a[0] + (next_a[0] - state.agent_a_pos[0])
             box_next_c = next_a[1] + (next_a[1] - state.agent_a_pos[1])
-            box_next = (box_next_c, box_next_r)
+            box_next = (box_next_r, box_next_c)
 
             # Hộp đụng tường, đụng hộp khác, hoặc đụng thằng B đang đứng/định đi tới
             if box_next in self.walls or box_next in new_boxes or box_next == next_b:
@@ -78,7 +78,7 @@ class TwoAgentProblem:
         elif next_b in new_boxes:
             box_next_r = next_b[0] + (next_b[0] - state.agent_b_pos[0])
             box_next_c = next_b[1] + (next_b[1] - state.agent_b_pos[1])
-            box_next = (box_next_c, box_next_r)
+            box_next = (box_next_r, box_next_c)
 
             # Chú ý: So sánh với next_a xem có đụng thằng A không
             if box_next in self.walls or box_next in new_boxes or box_next == next_a:
