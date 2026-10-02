@@ -4,6 +4,7 @@ CELL_SIZE = 44
 COLOR_WALL = (196, 164, 132)
 COLOR_WALL_EDGE = (150, 115, 85)
 COLOR_FLOOR = (235, 214, 182)
+COLOR_GOAL_FLOOR = (233, 150, 122)
 COLOR_GOAL_MARK = (255, 140, 0)
 COLOR_DOOR = (219, 90, 140)
 COLOR_DOOR_EDGE = (150, 50, 90)
@@ -72,9 +73,11 @@ class BoardView:
                 if pos in self.problem.walls:
                     screen.blit(self.wall_tile, rect)
                 else:
-                    pygame.draw.rect(screen, COLOR_FLOOR, rect)
                     if pos in self.problem.goals:
+                        pygame.draw.rect(screen, COLOR_GOAL_FLOOR, rect)
                         pygame.draw.rect(screen, COLOR_GOAL_MARK, rect, 3)
+                    else:
+                        pygame.draw.rect(screen, COLOR_FLOOR, rect)
         for box_pos in state.box_positions:
             rect = pygame.Rect(box_pos[1] * CELL_SIZE, box_pos[0] * CELL_SIZE,
                                 CELL_SIZE, CELL_SIZE).inflate(-8, -8)
