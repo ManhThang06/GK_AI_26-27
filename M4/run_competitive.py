@@ -35,7 +35,7 @@ def load_req2_heuristic(map_file, goals):
     return module.SokobanHeuristic(board_matrix, goals)
 
 def main():
-    map_file = os.path.join(ROOT, "M1", "example_map.txt")
+    map_file = os.path.join(ROOT, "M4", "competitive_map.txt")
     map_data = MapParser(map_file)
     initial_a = map_data.initial_agent
     directions = [
