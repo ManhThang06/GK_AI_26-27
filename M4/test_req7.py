@@ -38,7 +38,7 @@ def main():
     map_file = os.path.join(ROOT, "M1", "example_map.txt")
     map_data = MapParser(map_file)
     initial_a = map_data.initial_agent
-    initial_b = (initial_a[0], initial_a[1] + 1)
+    initial_b = (initial_a[0] + 1, initial_a[1])
     problem = TwoAgentProblem(map_data, initial_a, initial_b, 50)
     state = problem.initial_state
     heuristic = load_req2_heuristic(map_file, problem.goals)
