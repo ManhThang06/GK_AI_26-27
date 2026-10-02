@@ -38,7 +38,20 @@ def main():
     map_file = os.path.join(ROOT, "M1", "example_map.txt")
     map_data = MapParser(map_file)
     initial_a = map_data.initial_agent
-    initial_b = (initial_a[0] + 1, initial_a[1])
+    directions = [
+        (-1, 0), 
+        (1, 0),    
+        (0, -1),   
+        (0, 1)     
+    ]
+    initial_b = None
+    for dr, dc in directions:
+        pos = (initial_a[0] + dr, initial_a[1] + dc)
+        if (pos not in map_data.walls and pos not in map_data.initial_boxes and pos != initial_a):
+            initial_b = pos
+            break
+    if initial_b is None:
+        raise ValueError("Khong tim thay vi tri hop le cho Agent B")
     problem = TwoAgentProblem(map_data, initial_a, initial_b, n_steps=50)
     heuristic = load_req2_heuristic(map_file, problem.goals)
     agent_a = AgentAlgorithm1(heuristic=heuristic, time_limit=0.90)
