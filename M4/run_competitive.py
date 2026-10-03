@@ -52,6 +52,7 @@ def main():
             break
     if initial_b is None:
         raise ValueError("Khong tim thay vi tri hop le cho Agent B")
+        
     problem = TwoAgentProblem(map_data, initial_a, initial_b, n_steps=50)
     heuristic = load_req2_heuristic(map_file, problem.goals)
     agent_a = AgentAlgorithm1(heuristic=heuristic, time_limit=0.90)

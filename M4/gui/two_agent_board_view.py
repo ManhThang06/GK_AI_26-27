@@ -32,8 +32,8 @@ def make_wall_tile(size):
     return tile
 
 def draw_door(screen, rect, is_open, color):
-    body = COLOR_DOOR_OPEN if is_open else color
-    edge = COLOR_DOOR_OPEN_EDGE if is_open else COLOR_DOOR_EDGE
+    body = color
+    edge = COLOR_DOOR_EDGE
     pygame.draw.rect(screen, body, rect, border_radius=6)
     pygame.draw.rect(screen, edge, rect, 3, border_radius=6)
     if not is_open:
@@ -96,11 +96,12 @@ class TwoAgentBoardView:
                 else:
                     pygame.draw.rect(screen, COLOR_FLOOR, rect)
                     if pos in self.problem.goals:
+                        goal_color = COLOR_DOOR_OPEN_EDGE if pos in state.boxes else COLOR_GOAL_MARK
                         pygame.draw.rect(
-                        screen,
-                        COLOR_GOAL_MARK,
-                        rect,
-                        3
+                            screen,
+                            goal_color,
+                            rect,
+                            3
                         )
 
         owners = dict(state.box_owner)
@@ -112,7 +113,7 @@ class TwoAgentBoardView:
                 color = BOX_A
             elif owner == "B":
                 color = BOX_B
-            rect = pygame.Rect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+            rect = pygame.Rect(col * CELL_SIZE + 4, row * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
             draw_door(screen, rect, pos in self.problem.goals, color)
         ar, ac = state.agent_a_pos
         center_a = (ac * CELL_SIZE + CELL_SIZE // 2, ar * CELL_SIZE + CELL_SIZE // 2)
