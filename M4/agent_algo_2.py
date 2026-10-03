@@ -11,8 +11,39 @@ class AgentAlgorithm2:
     def set_heuristic(self, heuristic):
         self.heuristic = heuristic
 
-    def get_push_distance(self, agent_pos, boxes, problem):
-        min_distance = float("inf")
+    def bfs_distance(self, start, target, walls, blocked):
+        if start == target:
+            return 0
+        queue = [(start, 0)]
+        explored = {start}
+        directions = [
+            (-1, 0),
+            (1, 0),
+            (0, -1),
+            (0, 1)
+        ]
+        while queue:
+            current, distance = queue.pop(0)
+            for dr, dc in directions:
+                next_pos = (current[0] + dr, current[1] + dc)
+                if next_pos in explored:
+                    continue
+                if next_pos in walls:
+                    continue
+                if next_pos in blocked:
+                    continue
+                if next_pos == target:
+                    return distance + 1
+                explored.add(next_pos)
+                queue.append((next_pos, distance + 1))
+        return float("inf")
+    
+    def get_push_distance(self, agent_pos, boxes, problem, opponent):
+        min_distance = (float("inf"), float("inf"))
+        occupied_goals = set(boxes) & set(problem.goals)
+        free_goals = set(problem.goals) - occupied_goals
+        if not free_goals:
+            return (0, 0)
         directions = [
             (-1, 0),
             (1, 0),
@@ -20,6 +51,8 @@ class AgentAlgorithm2:
             (0, 1)
         ]
         for box in boxes:
+            if box in occupied_goals:
+                continue
             br, bc = box
             for dr, dc in directions:
                 push_pos = (br - dr, bc - dc)
@@ -32,8 +65,21 @@ class AgentAlgorithm2:
                     continue
                 if box_next in boxes:
                     continue
-                distance = (abs(agent_pos[0] - push_pos[0]) + abs(agent_pos[1] - push_pos[1]))
-                min_distance = min(min_distance, distance)
+                goal_distance = float("inf")
+                for goal in free_goals:
+                    if box_next in self.heuristic.maze_dist[goal]:
+                        d = self.heuristic.maze_dist[goal][box_next]
+                        if d < goal_distance:
+                            goal_distance = d
+                if goal_distance == float("inf"):
+                    continue
+                blocked = set(boxes)
+                blocked.add(opponent)
+                distance = self.bfs_distance(agent_pos, push_pos, problem.walls, blocked)
+                if distance == float("inf"):
+                    continue
+                push_priority = (goal_distance, distance)
+                min_distance = min(min_distance, push_priority)
         return min_distance
     
     def choose_action(self, state, problem):
@@ -43,7 +89,7 @@ class AgentAlgorithm2:
         start = (state.agent_b_pos, state.boxes)
         opponent = state.agent_a_pos
         current_h = self.heuristic.evaluate(state.boxes)
-        start_push_distance = self.get_push_distance(state.agent_b_pos, state.boxes, problem)
+        start_push_distance = self.get_push_distance(state.agent_b_pos, state.boxes, problem, opponent)
         frontier = []
         count = 0
         heapq.heappush(frontier,(current_h, start_push_distance, count, state.agent_b_pos, state.boxes))
@@ -117,7 +163,7 @@ class AgentAlgorithm2:
                 if next_state in frontier_h:
                     continue
                 next_h = self.heuristic.evaluate(next_boxes)
-                next_push_distance = self.get_push_distance(next_agent, next_boxes, problem)
+                next_push_distance = self.get_push_distance(next_agent, next_boxes, problem, opponent)
                 parent[next_state] = current
                 parent_action[next_state] = action
                 count += 1
