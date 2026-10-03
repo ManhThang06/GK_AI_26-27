@@ -12,7 +12,8 @@ from gui.widgets import (Button, make_bg, make_wall_tile, draw_box,
                          C_BOX_FREE, C_BOX_A, C_BOX_B, C_OUTLINE)
 from core.map_parser  import MapParser
 from core.two_agent   import TwoAgentProblem
-from core.agents      import AgentA, AgentB
+from core.agent1 import AgentAlgorithm1
+from core.agent2 import AgentAlgorithm2
 from core.heuristic   import Heuristic
 
 CELL  = 44
@@ -77,8 +78,8 @@ class TwoAgentApp:
         pos_a, pos_b = mp.two_agent_start()
         prob   = TwoAgentProblem(mp, pos_a, pos_b, self.n_steps)
         h      = Heuristic(mp.board_matrix, list(prob.goals))
-        agent_a = AgentA(heuristic=h, time_limit=0.9)
-        agent_b = AgentB(heuristic=h, time_limit=0.9)
+        agent_a = AgentAlgorithm1(heuristic=h, time_limit=0.9)
+        agent_b = AgentAlgorithm2(heuristic=h, time_limit=0.9)
         return prob, agent_a, agent_b
 
     def run(self):
@@ -107,12 +108,30 @@ class TwoAgentApp:
             nonlocal state, t_a, t_b
             if prob.is_terminal(state): return
             pre = state
-            t0  = time.perf_counter()
-            a_a = agent_a.choose_action(pre, prob)
+
+            t0 = time.perf_counter()
+            if agent_a.steal_mode:
+                a_a = agent_a.choose_steal_action(pre, prob)
+            else:
+                a_a = agent_a.choose_action(pre, prob)
+                if agent_a.target_box is None:
+                    steal_a = agent_a.choose_steal_action(pre, prob)
+                    if steal_a != "Wait":
+                        a_a = steal_a
             t_a = (time.perf_counter() - t0) * 1000
-            t0  = time.perf_counter()
-            a_b = agent_b.choose_action(pre, prob)
+
+            t0 = time.perf_counter()
+            if agent_b.steal_mode:
+                a_b = agent_b.choose_steal_action(pre, prob)
+            else:
+                a_b = agent_b.choose_action(pre, prob)
+                if agent_b.target_box is None:
+                    steal_b = agent_b.choose_steal_action(pre, prob)
+                    if steal_b != "Wait":
+                        a_b = steal_b
             t_b = (time.perf_counter() - t0) * 1000
+
+            # Ca hai action deu duoc chon tu cung pre-state.
             state = prob.transition_model(pre, a_a, a_b)
 
         running = True
@@ -133,7 +152,6 @@ class TwoAgentApp:
                 do_step()
                 if prob.is_terminal(state): paused = True
 
-            # ── Draw ────────────────────────────────────────────────────────
             self.screen.blit(bg, (0, 0))
 
             btn_toggle.text = "PAUSE" if not paused else "START"
