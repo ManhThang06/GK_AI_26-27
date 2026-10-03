@@ -12,8 +12,13 @@ class TwoAgentProblem:
             steps_left=n_steps,
             box_owner=None
         )
+    # 1. THÊM HÀM KIỂM TRA TẤT CẢ HỘP ĐÃ VÀO ĐÍCH CHƯA
+    def all_boxes_on_goals(self, state):
+        # Trả về True nếu mọi box trong state hiện tại đều nằm trong danh sách goals
+        return all(box in self.goals for box in state.boxes)
     def is_terminal(self, state):
-        return state.steps_left <= 0
+        # Game over khi: Tất cả hộp đã vào đích HOẶC hết số bước đi
+        return self.all_boxes_on_goals(state) or state.steps_left <= 0
 
     def utility(self, state):
         return (state.score_a, state.score_b)
@@ -48,9 +53,7 @@ class TwoAgentProblem:
 
         # Chuẩn bị biến để tính toán dời hộp
         new_boxes = set(state.boxes)
-        new_box_owner = dict(state.box_owner)
-        score_a = state.score_a
-        score_b = state.score_b
+        new_box_owner = dict(state.box_owner) if state.box_owner is not None else {}
 
         # 3. XỬ LÝ AGENT A
         if next_a in self.walls:
@@ -69,9 +72,6 @@ class TwoAgentProblem:
                 new_boxes.add(box_next)
                 new_box_owner.pop(next_a, None) # Xóa thông tin hộp ở vị trí cũ
                 new_box_owner[box_next] = 'A'
-                if box_next in self.goals:
-                    score_a += 1
-
         # 4. XỬ LÝ AGENT B (Code lặp lại logic của A)
         if next_b in self.walls:
             next_b = state.agent_b_pos
@@ -88,7 +88,15 @@ class TwoAgentProblem:
                 new_boxes.add(box_next)
                 new_box_owner.pop(next_b, None) # Xóa thông tin hộp ở vị trí cũ
                 new_box_owner[box_next] = 'B'
-                if box_next in self.goals:
+        # 5. TÍNH TOÁN LẠI ĐIỂM SỐ CHUẨN XÁC
+        score_a = 0
+        score_b = 0
+        for box in new_boxes:
+            if box in self.goals:
+                owner = new_box_owner.get(box)
+                if owner == 'A':
+                    score_a += 1
+                elif owner == 'B':
                     score_b += 1
         return TwoAgentState(
             agent_a_pos=next_a,
