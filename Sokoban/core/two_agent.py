@@ -1,153 +1,175 @@
-import time
-import pygame
+"""
+core/two_agent.py
+State va transition model cho che do 2 Agent canh tranh.
+"""
 
-try:
-    from .two_agent_board_view import TwoAgentBoardView
-    from .ui_widgets import make_grass
-except ImportError:
-    from two_agent_board_view import TwoAgentBoardView
-    from ui_widgets import make_grass
+_MOVE = {
+    "North": (-1, 0),
+    "South": (1, 0),
+    "West": (0, -1),
+    "East": (0, 1),
+    "Wait": (0, 0),
+}
 
-PANEL_WIDTH = 220
-MARGIN = 20
-MIN_HEIGHT = 460
-COLOR_INFO_BOX = (25, 25, 25)
-COLOR_INFO_TEXT = (255, 255, 255)
-COLOR_STATUS = (250, 210, 60)
 
-class TwoAgentCompetitiveApp:
-    def __init__(self, problem, agent_a, agent_b, fps=5):
-        pygame.init()
+class TwoAgentState:
+    def __init__(self, agent_a_pos, agent_b_pos, boxes,
+                 score_a, score_b, steps_left, box_owner=None):
+        self.agent_a_pos = agent_a_pos
+        self.agent_b_pos = agent_b_pos
+        self.boxes = frozenset(boxes)
+        self.score_a = score_a
+        self.score_b = score_b
+        self.steps_left = steps_left
 
-        self.problem = problem
-        self.state = problem.initial_state
-        self.agent_a = agent_a
-        self.agent_b = agent_b
-        self.view = TwoAgentBoardView(problem)
-        self.board_surface = pygame.Surface((self.view.width, self.view.height))
-        self.board_pos = (PANEL_WIDTH + MARGIN, MARGIN)
-        self.width = (PANEL_WIDTH + self.view.width + 2 * MARGIN)
-        self.height = max(self.view.height + 2 * MARGIN, MIN_HEIGHT)
-        self.background = make_grass(self.width, self.height)
-        self.screen = pygame.display.set_mode((self.width, self.height))
-        pygame.display.set_caption("Sokoban - Competitive Mode")
-        self.font = pygame.font.Font(None, 22)
-        self.clock = pygame.time.Clock()
-        self.fps = fps
-        self.running = True
-        self.paused = True
-        self.time_a_ms = 0.0
-        self.time_b_ms = 0.0
-        self.history = [self.state]
-        self.history_times = [(0.0, 0.0)]
-        self.history_index = 0
-        self.start_button = pygame.Rect(MARGIN, 315, PANEL_WIDTH - 2 * MARGIN, 40)
-
-    def step(self):
-        if self.paused or self.problem.is_terminal(self.state):
-            return
-
-        pre_state = self.state
-        start = time.perf_counter()
-        action_a = self.agent_a.choose_action(pre_state, self.problem)
-        self.time_a_ms = (time.perf_counter() - start) * 1000
-        start = time.perf_counter()
-        action_b = self.agent_b.choose_action(pre_state, self.problem)
-        self.time_b_ms = (time.perf_counter() - start) * 1000
-        self.state = self.problem.transition_model(pre_state, action_a, action_b)
-
-        # Neu dang o mot state cu va chay lai, bo nhanh history phia truoc.
-        if self.history_index < len(self.history) - 1:
-            self.history = self.history[:self.history_index + 1]
-            self.history_times = self.history_times[:self.history_index + 1]
-
-        self.history.append(self.state)
-        self.history_times.append((self.time_a_ms, self.time_b_ms))
-        self.history_index += 1
-
-    def text(self, value, x, y, size=24):
-        font = pygame.font.Font(None, size)
-        image = font.render(value, True, (30, 30, 30))
-        self.screen.blit(image, (x, y))
-
-    def draw(self):
-        self.screen.blit(self.background, (0, 0))
-        info_rect = pygame.Rect(MARGIN, 60, PANEL_WIDTH - 2 * MARGIN, 230)
-        pygame.draw.rect(self.screen, COLOR_INFO_BOX, info_rect, border_radius=8)
-        x = MARGIN + 15
-        y = 75
-        text = self.font.render("COMPETITIVE MODE", True, COLOR_INFO_TEXT)
-        self.screen.blit(text, (x, y))
-        y += 35
-        text = self.font.render("Agent A", True, COLOR_INFO_TEXT)
-        self.screen.blit(text, (x, y))
-        y += 25
-        text = self.font.render(f"Score: {self.state.score_a}", True, COLOR_INFO_TEXT)
-        self.screen.blit(text, (x, y))
-        y += 25
-        text = self.font.render(f"Time: {self.time_a_ms:.2f} ms", True, COLOR_INFO_TEXT)
-        self.screen.blit(text, (x, y))
-
-        y += 35
-        text = self.font.render("Agent B", True, COLOR_INFO_TEXT)
-        self.screen.blit(text, (x, y))
-        y += 25
-        text = self.font.render(f"Score: {self.state.score_b}", True, COLOR_INFO_TEXT)
-        self.screen.blit(text, (x, y))
-        y += 25
-        text = self.font.render(f"Time: {self.time_b_ms:.2f} ms", True, COLOR_INFO_TEXT)
-        self.screen.blit(text, (x, y))
-        y += 30
-        if self.paused:
-            button_text = "START"
+        if box_owner is None:
+            owner = {box: None for box in boxes}
+        elif isinstance(box_owner, dict):
+            owner = dict(box_owner)
         else:
-            button_text = "PAUSE"
-        button_image = self.font.render(button_text, True, COLOR_INFO_TEXT)
-        button_rect = button_image.get_rect(center=self.start_button.center)
-        self.screen.blit(button_image, button_rect)
-        text = self.font.render(f"Steps left: {self.state.steps_left}", True, COLOR_INFO_TEXT)
-        self.screen.blit(text, (x, y))
-        y += 25
-        text = self.font.render(f"Actions: {self.history_index}", True, COLOR_INFO_TEXT)
-        self.screen.blit(text, (x, y))
-        self.text("Space: Pause | Left: Back | Right: Forward", MARGIN, self.height - 28, 18)
-        pygame.draw.rect(self.screen, (240, 150, 50), self.start_button, border_radius=8)
-        
-        if self.paused:
-            self.text("PAUSED", 560, 50, 22)
-        if self.problem.is_terminal(self.state):
-            self.text("GAME OVER", 560, 15, 22)
-        self.board_surface.fill((255, 255, 255))
-        self.view.draw(self.board_surface, self.state)
-        self.screen.blit(self.board_surface, self.board_pos)
-        pygame.display.flip()
+            owner = dict(box_owner)
 
-    def events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    self.paused = not self.paused
-                elif event.key == pygame.K_LEFT:
-                    self.paused = True
-                    if self.history_index > 0:
-                        self.history_index -= 1
-                        self.state = self.history[self.history_index]
-                        self.time_a_ms, self.time_b_ms = self.history_times[self.history_index]
-                elif event.key == pygame.K_RIGHT:
-                    self.paused = True
-                    if self.history_index < len(self.history) - 1:
-                        self.history_index += 1
-                        self.state = self.history[self.history_index]
-                        self.time_a_ms, self.time_b_ms = self.history_times[self.history_index]
-                elif event.key == pygame.K_ESCAPE:
-                    self.running = False
+        self.box_owner = frozenset(owner.items())
 
-    def run(self):
-        while self.running:
-            self.events()
-            self.step()
-            self.draw()
-            self.clock.tick(self.fps)
-        pygame.quit()
+    def __eq__(self, other):
+        return (
+            isinstance(other, TwoAgentState)
+            and self.agent_a_pos == other.agent_a_pos
+            and self.agent_b_pos == other.agent_b_pos
+            and self.boxes == other.boxes
+            and self.score_a == other.score_a
+            and self.score_b == other.score_b
+            and self.steps_left == other.steps_left
+            and self.box_owner == other.box_owner
+        )
+
+    def __hash__(self):
+        return hash((
+            self.agent_a_pos, self.agent_b_pos, self.boxes,
+            self.score_a, self.score_b, self.steps_left, self.box_owner
+        ))
+
+
+class TwoAgentProblem:
+    def __init__(self, map_data, initial_a, initial_b, n_steps):
+        self.walls = set(map_data.walls)
+        self.goals = set(map_data.goals)
+        self.initial_state = TwoAgentState(
+            initial_a, initial_b, map_data.initial_boxes,
+            0, 0, n_steps, None
+        )
+
+    def is_terminal(self, state):
+        # Req 6: chi ket thuc khi het n step.
+        return state.steps_left <= 0
+
+    def utility(self, state):
+        return state.score_a, state.score_b
+
+    def _intent(self, agent_pos, action, boxes):
+        dr, dc = _MOVE.get(action, (0, 0))
+        next_pos = (agent_pos[0] + dr, agent_pos[1] + dc)
+
+        if next_pos in self.walls:
+            return agent_pos, None, None
+
+        if next_pos in boxes:
+            if action == "Wait":
+                return agent_pos, None, None
+            box_to = (next_pos[0] + dr, next_pos[1] + dc)
+            return next_pos, next_pos, box_to
+
+        return next_pos, None, None
+
+    def transition_model(self, state, action_a, action_b):
+        if self.is_terminal(state):
+            return state
+
+        old_boxes = set(state.boxes)
+
+        # Ca A va B deu tinh action tu cung mot pre-state.
+        next_a, a_from, a_to = self._intent(
+            state.agent_a_pos, action_a, old_boxes
+        )
+        next_b, b_from, b_to = self._intent(
+            state.agent_b_pos, action_b, old_boxes
+        )
+
+        valid_a = True
+        valid_b = True
+
+        if a_from is not None:
+            if a_to in self.walls or a_to in old_boxes:
+                valid_a = False
+
+        if b_from is not None:
+            if b_to in self.walls or b_to in old_boxes:
+                valid_b = False
+
+        # Khong duoc di xuyen qua nhau.
+        if next_a == state.agent_b_pos and next_b == state.agent_a_pos:
+            valid_a = False
+            valid_b = False
+
+        # Khong duoc cung vao mot o.
+        if next_a == next_b and (
+            next_a != state.agent_a_pos or next_b != state.agent_b_pos
+        ):
+            valid_a = False
+            valid_b = False
+
+        # Khong day box vao vi tri agent kia.
+        if valid_a and a_from is not None and a_to == next_b:
+            valid_a = False
+        if valid_b and b_from is not None and b_to == next_a:
+            valid_b = False
+
+        # Conflict box: cung day mot box hoac cung day den mot o.
+        if valid_a and valid_b and a_from is not None and b_from is not None:
+            if a_from == b_from or a_to == b_to:
+                valid_a = False
+                valid_b = False
+
+        if not valid_a:
+            next_a = state.agent_a_pos
+            a_from = a_to = None
+
+        if not valid_b:
+            next_b = state.agent_b_pos
+            b_from = b_to = None
+
+        if next_a == next_b:
+            next_a = state.agent_a_pos
+            next_b = state.agent_b_pos
+            a_from = a_to = None
+            b_from = b_to = None
+
+        new_boxes = set(old_boxes)
+        owners = dict(state.box_owner)
+
+        if a_from is not None:
+            new_boxes.remove(a_from)
+            new_boxes.add(a_to)
+            owners.pop(a_from, None)
+            owners[a_to] = "A"
+
+        if b_from is not None:
+            new_boxes.remove(b_from)
+            new_boxes.add(b_to)
+            owners.pop(b_from, None)
+            owners[b_to] = "B"
+
+        # Tinh lai score theo owner cua box dang o goal.
+        score_a = sum(
+            1 for box in new_boxes
+            if box in self.goals and owners.get(box) == "A"
+        )
+        score_b = sum(
+            1 for box in new_boxes
+            if box in self.goals and owners.get(box) == "B"
+        )
+
+        return TwoAgentState(
+            next_a, next_b, new_boxes,
+            score_a, score_b, state.steps_left - 1, owners
+        )
