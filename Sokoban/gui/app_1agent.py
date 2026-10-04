@@ -1,12 +1,3 @@
-"""
-gui/app_1agent.py
-Màn hình chơi chế độ 1 Agent.
-- Vào map: hiển thị hướng dẫn "Nhấn SPACE để bắt đầu"
-- Nhấn SPACE lần đầu: hiện "Đang tính toán..." rồi chạy tự động
-- SPACE khi đang chạy: tạm dừng / tiếp tục
-- ← / →: lùi / tiến từng bước khi đang tạm dừng
-- Nút ← Menu: quay về menu
-"""
 import threading
 import pygame
 from gui.widgets import (Button, make_bg, make_wall_tile, draw_box, draw_doraemon,
@@ -21,15 +12,14 @@ CELL  = 44
 PANEL = 220
 MRG   = 20
 MIN_H = 460
-DELAY = 220   # ms giữa mỗi bước tự động
+DELAY = 220  
 
-# Trạng thái nội bộ của màn chơi
-_ST_WAITING   = "waiting"    # chờ người dùng nhấn SPACE lần đầu
-_ST_SOLVING   = "solving"    # đang tính toán (thread)
-_ST_NO_SOL    = "no_sol"     # không tìm được lời giải
-_ST_PLAYING   = "playing"    # đang tự chạy
-_ST_PAUSED    = "paused"     # tạm dừng
-_ST_DONE      = "done"       # hoàn thành
+_ST_WAITING   = "waiting"    
+_ST_SOLVING   = "solving"    
+_ST_NO_SOL    = "no_sol"     
+_ST_PLAYING   = "playing"  
+_ST_PAUSED    = "paused"   
+_ST_DONE      = "done"    
 
 
 class _BoardView:
@@ -99,7 +89,7 @@ class SingleAgentApp:
         idx     = 0
         timer   = 0
         phase   = _ST_WAITING
-        dot_t   = 0    # cho animation "..."
+        dot_t   = 0   
         dots    = 0
 
         def _solve_thread():
@@ -117,7 +107,7 @@ class SingleAgentApp:
                 s = problem.result(s, a)
                 st.append(s)
             states = st
-            phase  = _ST_PLAYING   # bắt đầu chạy ngay khi có lời giải
+            phase  = _ST_PLAYING   
 
         while True:
             dt = self.clock.tick(60)
@@ -129,7 +119,6 @@ class SingleAgentApp:
                 if ev.type == pygame.KEYDOWN:
                     if ev.key == pygame.K_SPACE:
                         if phase == _ST_WAITING:
-                            # Start solving in background thread
                             phase = _ST_SOLVING
                             threading.Thread(target=_solve_thread, daemon=True).start()
                         elif phase == _ST_PLAYING:
@@ -137,13 +126,11 @@ class SingleAgentApp:
                         elif phase == _ST_PAUSED:
                             if idx < len(states) - 1:
                                 phase = _ST_PLAYING
-                        # Khi done hoặc no_sol: space không làm gì
                     elif ev.key == pygame.K_LEFT and phase == _ST_PAUSED:
                         if idx > 0: idx -= 1
                     elif ev.key == pygame.K_RIGHT and phase == _ST_PAUSED:
                         if idx < len(states) - 1: idx += 1
 
-            # Auto-play
             if phase == _ST_PLAYING:
                 timer += dt
                 if timer >= DELAY:
@@ -153,27 +140,22 @@ class SingleAgentApp:
                     else:
                         phase = _ST_DONE
 
-            # Dot animation khi đang tính
             if phase == _ST_SOLVING:
                 dot_t += dt
                 if dot_t >= 400:
                     dot_t = 0
                     dots  = (dots + 1) % 4
 
-            # ── Draw ─────────────────────────────────────────────────────────
             self.screen.blit(bg, (0, 0))
 
-            # Board
             view.draw(bsurf, states[idx])
             br = bsurf.get_rect(topleft=bpos)
             self.screen.blit(bsurf, br)
             pygame.draw.rect(self.screen, C_OUTLINE, br.inflate(6, 6), 3)
 
-            # Header labels
             shadow_text(self.screen, self._f_big, "Level: " + self.level_name, (MRG, 15))
             shadow_text(self.screen, self._f_med, self.algorithm, (MRG, 55))
 
-            # Info box
             info = pygame.Rect(MRG, 95, PANEL - 2 * MRG, 130)
             pygame.draw.rect(self.screen, C_INFO_BG, info, border_radius=8)
             x0, y0 = info.x + 12, info.y + 12
@@ -193,7 +175,7 @@ class SingleAgentApp:
             elif phase == _ST_PAUSED:
                 status = "Paused"
                 hint   = "SPACE: resume  ←/→: step"
-            else:  # done
+            else:  
                 status = "Completed! 🎉"
                 hint   = ""
 

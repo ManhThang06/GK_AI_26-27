@@ -1,7 +1,3 @@
-"""
-gui/widgets.py
-Các thành phần UI dùng chung: Button, nền cỏ, vẽ agent Doraemon & Agent B.
-"""
 import pygame
 
 C_BG             = (210, 185, 155)
@@ -64,7 +60,6 @@ def make_wall_tile(size: int) -> pygame.Surface:
 
 def draw_box(screen: pygame.Surface, rect: pygame.Rect,
              on_goal: bool, color: tuple):
-    """Vẽ thùng với màu theo chủ sở hữu; viền xanh lá nếu nằm trên đích."""
     pygame.draw.rect(screen, color, rect, border_radius=6)
     edge = C_GOAL_MARK_DONE if on_goal else C_BOX_EDGE
     pygame.draw.rect(screen, edge, rect, 3, border_radius=6)

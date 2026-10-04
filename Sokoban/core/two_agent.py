@@ -1,8 +1,3 @@
-"""
-core/two_agent.py
-State va transition model cho che do 2 Agent canh tranh.
-"""
-
 _MOVE = {
     "North": (-1, 0),
     "South": (1, 0),
@@ -10,7 +5,6 @@ _MOVE = {
     "East": (0, 1),
     "Wait": (0, 0),
 }
-
 
 class TwoAgentState:
     def __init__(self, agent_a_pos, agent_b_pos, boxes,
@@ -60,7 +54,6 @@ class TwoAgentProblem:
         )
 
     def is_terminal(self, state):
-        # Req 6: chi ket thuc khi het n step.
         return state.steps_left <= 0
 
     def utility(self, state):
@@ -87,7 +80,6 @@ class TwoAgentProblem:
 
         old_boxes = set(state.boxes)
 
-        # Ca A va B deu tinh action tu cung mot pre-state.
         next_a, a_from, a_to = self._intent(
             state.agent_a_pos, action_a, old_boxes
         )
@@ -106,25 +98,21 @@ class TwoAgentProblem:
             if b_to in self.walls or b_to in old_boxes:
                 valid_b = False
 
-        # Khong duoc di xuyen qua nhau.
         if next_a == state.agent_b_pos and next_b == state.agent_a_pos:
             valid_a = False
             valid_b = False
 
-        # Khong duoc cung vao mot o.
         if next_a == next_b and (
             next_a != state.agent_a_pos or next_b != state.agent_b_pos
         ):
             valid_a = False
             valid_b = False
 
-        # Khong day box vao vi tri agent kia.
         if valid_a and a_from is not None and a_to == next_b:
             valid_a = False
         if valid_b and b_from is not None and b_to == next_a:
             valid_b = False
 
-        # Conflict box: cung day mot box hoac cung day den mot o.
         if valid_a and valid_b and a_from is not None and b_from is not None:
             if a_from == b_from or a_to == b_to:
                 valid_a = False
@@ -159,7 +147,6 @@ class TwoAgentProblem:
             owners.pop(b_from, None)
             owners[b_to] = "B"
 
-        # Tinh lai score theo owner cua box dang o goal.
         score_a = sum(
             1 for box in new_boxes
             if box in self.goals and owners.get(box) == "A"

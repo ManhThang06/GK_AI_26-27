@@ -1,16 +1,5 @@
-"""
-core/sokoban.py
-Trạng thái, bài toán và các thuật toán tìm kiếm cho chế độ 1 Agent.
-  - SokobanState  : trạng thái (agent_pos, boxes)
-  - SokobanProblem: luật di chuyển và hàm goal_test
-  - ucs()         : Uniform Cost Search
-  - astar()       : A* Search
-"""
 import heapq
 from core.heuristic import Heuristic
-
-
-# ── State ────────────────────────────────────────────────────────────────────
 
 class SokobanState:
     __slots__ = ("agent_pos", "boxes")
@@ -25,11 +14,8 @@ class SokobanState:
     def __hash__(self):
         return hash((self.agent_pos, self.boxes))
 
-    def __lt__(self, other):   # cho heapq
+    def __lt__(self, other):
         return False
-
-
-# ── Problem ──────────────────────────────────────────────────────────────────
 
 DIRS = {
     "North": (-1, 0),
@@ -37,7 +23,6 @@ DIRS = {
     "West":  (0, -1),
     "East":  (0,  1),
 }
-
 
 class SokobanProblem:
     def __init__(self, map_parser):
@@ -52,7 +37,6 @@ class SokobanProblem:
         return state.boxes == self.goals
 
     def result(self, state: SokobanState, action: str) -> SokobanState:
-        """Áp dụng action, trả về trạng thái mới (hoặc nguyên bản nếu không hợp lệ)."""
         dr, dc = DIRS[action]
         r, c = state.agent_pos
         nr, nc = r + dr, c + dc
@@ -70,7 +54,6 @@ class SokobanProblem:
         return SokobanState((nr, nc), state.boxes)
 
     def successors(self, state: SokobanState):
-        """Sinh các trạng thái kế tiếp hợp lệ: [(action, new_state, cost)]"""
         results = []
         r, c = state.agent_pos
         for action, (dr, dc) in DIRS.items():
@@ -89,16 +72,9 @@ class SokobanProblem:
                 results.append((action, SokobanState((nr, nc), state.boxes), 1))
         return results
 
-
-# ── UCS ──────────────────────────────────────────────────────────────────────
-
 def ucs(problem: SokobanProblem):
-    """
-    Uniform Cost Search.
-    Trả về (path, cost, nodes_expanded) hoặc (None, inf, nodes_expanded).
-    """
     start = problem.initial_state
-    frontier = [(0, 0, start, [])]   # (g, tie, state, path)
+    frontier = [(0, 0, start, [])]  
     visited = {start: 0}
     expanded = 0
     counter = 1
@@ -119,17 +95,10 @@ def ucs(problem: SokobanProblem):
 
     return None, float("inf"), expanded
 
-
-# ── A* ───────────────────────────────────────────────────────────────────────
-
 def astar(problem: SokobanProblem, heuristic: Heuristic):
-    """
-    A* Search với heuristic BFS.
-    Trả về (path, cost, nodes_expanded) hoặc (None, inf, nodes_expanded).
-    """
     start = problem.initial_state
     h0 = heuristic.evaluate(start.boxes)
-    frontier = [(h0, 0, 0, start, [])]   # (f, g, tie, state, path)
+    frontier = [(h0, 0, 0, start, [])]  
     visited = {start: 0}
     expanded = 0
     counter = 1
@@ -146,7 +115,7 @@ def astar(problem: SokobanProblem, heuristic: Heuristic):
             if new_g < visited.get(next_state, float("inf")):
                 h = heuristic.evaluate(next_state.boxes)
                 if h == float("inf"):
-                    continue   # deadlock, bỏ qua
+                    continue  
                 visited[next_state] = new_g
                 heapq.heappush(frontier, (new_g + h, new_g, counter, next_state, path + [action]))
                 counter += 1

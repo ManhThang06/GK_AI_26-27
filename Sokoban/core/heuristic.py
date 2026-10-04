@@ -1,17 +1,10 @@
-"""
-core/heuristic.py
-Heuristic dựa trên BFS: tính khoảng cách ngắn nhất từ mỗi ô đích
-đến mọi ô trên bản đồ (precompute). Dùng cho cả 1-agent và 2-agent.
-"""
 from collections import deque
-
 
 class Heuristic:
     DIRS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
     def __init__(self, board_matrix: list[list[str]], goals: list[tuple]):
         self.goals = goals
-        # maze_dist[goal][(r,c)] = khoảng cách BFS từ goal đến (r,c)
         self.maze_dist: dict[tuple, dict[tuple, int]] = {}
         for goal in goals:
             self.maze_dist[goal] = self._bfs(board_matrix, goal)
@@ -31,10 +24,6 @@ class Heuristic:
         return dist
 
     def evaluate(self, boxes: frozenset) -> float:
-        """
-        Tổng khoảng cách nhỏ nhất từ mỗi thùng đến đích gần nhất.
-        Trả về inf nếu có thùng không thể đến bất kỳ đích nào (deadlock).
-        """
         total = 0
         for box in boxes:
             min_d = float("inf")

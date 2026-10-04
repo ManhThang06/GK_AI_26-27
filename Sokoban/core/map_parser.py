@@ -1,14 +1,3 @@
-"""
-core/map_parser.py
-Đọc và phân tích file bản đồ .txt với định nghĩa ký tự:
-  %  = tường
-  A  = vị trí khởi đầu Agent (chế độ 1 agent)
-  B  = thùng (box)
-  D  = ô đích (goal)
-  C  = thùng đang nằm trên ô đích
-"""
-
-
 class MapParser:
     def __init__(self, filepath: str):
         self.filepath = filepath
@@ -35,7 +24,6 @@ class MapParser:
 
     @property
     def board_matrix(self) -> list[list[str]]:
-        """Trả về bản đồ dạng ma trận 2D (dùng để tính heuristic BFS)."""
         if not self._lines:
             return []
         max_cols = max(len(l) for l in self._lines)
@@ -46,16 +34,11 @@ class MapParser:
         return matrix
 
     def two_agent_start(self) -> tuple[tuple, tuple]:
-        """
-        Trả về (pos_A, pos_B) cho chế độ 2 agent.
-        pos_A = vị trí ký tự 'A' trên bản đồ.
-        pos_B = ô trống gần nhất kề pos_A (không phải tường, không phải thùng).
-        """
         if self.initial_agent is None:
-            raise ValueError("Bản đồ thiếu ký tự 'A'.")
+            raise ValueError("Not found 'A'.")
         pos_a = self.initial_agent
         for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             pos_b = (pos_a[0] + dr, pos_a[1] + dc)
             if pos_b not in self.walls and pos_b not in self.initial_boxes:
                 return pos_a, pos_b
-        raise ValueError("Không tìm được vị trí hợp lệ cho Agent B.")
+        raise ValueError("Not found a valid position for Agent B.")

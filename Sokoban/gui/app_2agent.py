@@ -1,8 +1,3 @@
-"""
-gui/app_2agent.py
-Màn hình chơi chế độ 2 Agent cạnh tranh.
-Hiển thị bản đồ, điểm số, bước còn lại; nút START/PAUSE, STEP, RESTART, BACK.
-"""
 import time
 import pygame
 from gui.widgets import (Button, make_bg, make_wall_tile, draw_box,
@@ -97,7 +92,6 @@ class TwoAgentApp:
         t_a, t_b = 0.0, 0.0
         clock   = pygame.time.Clock()
 
-        # Buttons
         btn_back    = Button((MRG, 18,  PANEL - 2*MRG, 36), "← Menu",   self._f_btn)
         btn_toggle  = Button((MRG, 315, PANEL - 2*MRG, 40), "START",   self._f_btn)
         btn_step    = Button((MRG, 365, PANEL - 2*MRG, 40), "STEP",    self._f_btn)
@@ -131,7 +125,6 @@ class TwoAgentApp:
                 if btn_step.handle_event(ev):
                     if paused and not prob.is_terminal(state): do_step()
                 if btn_restart.handle_event(ev):
-                    # Tao lai toan bo game de xoa trang thai cu cua 2 agent.
                     prob, agent_a, agent_b = self._build()
                     state = prob.initial_state
                     view = _BoardView2(prob)
@@ -149,7 +142,6 @@ class TwoAgentApp:
             for btn in (btn_back, btn_toggle, btn_step, btn_restart):
                 btn.draw(self.screen)
 
-            # Info panel
             ip = pygame.Rect(MRG, 65, PANEL - 2*MRG, 235)
             pygame.draw.rect(self.screen, C_INFO_BG, ip, border_radius=8)
             f, x, y = self._f, MRG + 12, 80
@@ -166,12 +158,10 @@ class TwoAgentApp:
             y += 6
             lbl(f"Steps left : {state.steps_left}", C_STATUS)
 
-            # Board
             bsurf.fill((255, 255, 255))
             view.draw(bsurf, state)
             self.screen.blit(bsurf, bpos)
 
-            # Game-over overlay
             if prob.is_terminal(state):
                 if   state.score_a > state.score_b: res = "AGENT A WINS! 🎉"
                 elif state.score_b > state.score_a: res = "AGENT B WINS! 🎉"

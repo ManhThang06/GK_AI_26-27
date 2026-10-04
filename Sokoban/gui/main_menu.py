@@ -1,10 +1,3 @@
-"""
-gui/main_menu.py
-Màn hình chính: Chọn chế độ → Chọn thuật toán / Nhập steps → Chọn map.
-Trả về (mode, data) khi hoàn tất:
-  mode="1 Agent"  →  data=(algorithm: str, map_path: str)
-  mode="2 Agents" →  data=(n_steps: int, map_path: str)
-"""
 import os
 import pygame
 from gui.widgets import Button, make_bg, C_TEXT, C_SHADOW, C_NOTE, C_INPUT_BG, C_INPUT_BORDER
@@ -50,24 +43,21 @@ class MainMenu:
         self._f_inp   = pygame.font.SysFont("arial", 26, bold=True)
 
         cx = WIDTH // 2 - 100
-        # Mode
         self.b_one  = Button((cx, 165, 200, 48), "1 Agent",  f_btn)
         self.b_two  = Button((cx, 235, 200, 48), "2 Agents", f_btn)
         self.b_exit = Button((cx, 305, 200, 48), "Exit",     f_btn)
-        # Algo
+
         self.b_ucs   = Button((WIDTH//2 - 105, 170, 100, 48), "UCS", f_btn)
         self.b_astar = Button((WIDTH//2 + 5,   170, 100, 48), "A*",  f_btn)
         self.b_next  = Button((cx, 255, 200, 48), "Next →",  f_btn)
         self.b_back  = Button((cx, 320, 200, 48), "← Back",  f_btn)
         self.b_ucs.selected = True
-        # Steps
+
         self.input_rect   = pygame.Rect(WIDTH//2 - 80, 200, 160, 44)
         self.b_steps_next = Button((cx, 275, 200, 48), "Next →", f_btn)
         self.b_steps_back = Button((cx, 340, 200, 48), "← Back", f_btn)
-        # Map
-        self.b_map_back = Button((cx, 450, 200, 44), "← Back", f_sm)
 
-    # ── Button sets ──────────────────────────────────────────────────────────
+        self.b_map_back = Button((cx, 450, 200, 44), "← Back", f_sm)
 
     def _active_btns(self) -> list[Button]:
         if self.state == _S_MODE:
@@ -77,8 +67,6 @@ class MainMenu:
         if self.state == _S_STEPS:
             return [self.b_steps_next, self.b_steps_back]
         return self.map_buttons + [self.b_map_back]
-
-    # ── Click handler ────────────────────────────────────────────────────────
 
     def _on_click(self, btn: Button):
         if btn is self.b_exit:
@@ -105,7 +93,6 @@ class MainMenu:
         elif btn is self.b_map_back:
             self.state = _S_ALGO if self.state == _S_MAP1 else _S_STEPS
         else:
-            # map button — tìm index trong map_buttons để lấy filename gốc
             folder = MAP1_DIR if self.state == _S_MAP1 else MAP2_DIR
             idx    = self.map_buttons.index(btn)
             path   = os.path.join(folder, self._map_filenames[idx])
@@ -118,14 +105,11 @@ class MainMenu:
     def _build_maps(self, folder: str):
         maps = _get_maps(folder)
         f = pygame.font.SysFont("arial", 18, bold=True)
-        # Lưu tên file gốc để dùng khi build path, nhưng hiển thị dạng 'Map 1'
         self._map_filenames = maps
         self.map_buttons = [
             Button((WIDTH//2 - 130, 155 + i * 52, 260, 42), f"Map {i+1}", f)
             for i, name in enumerate(maps)
         ]
-
-    # ── Input ────────────────────────────────────────────────────────────────
 
     def _handle_key(self, event):
         if self.state == _S_STEPS and event.type == pygame.KEYDOWN:
@@ -134,12 +118,9 @@ class MainMenu:
             elif event.unicode.isdigit() and len(self.steps_input) < 4:
                 self.steps_input += event.unicode
 
-    # ── Draw ─────────────────────────────────────────────────────────────────
-
     def _draw(self):
         self.screen.blit(self.bg, (0, 0))
 
-        # Title
         sh = self._f_title.render("SOKOBAN", True, C_SHADOW)
         ti = self._f_title.render("SOKOBAN", True, C_TEXT)
         self.screen.blit(sh, sh.get_rect(center=(WIDTH//2 + 2, 67)))
@@ -159,7 +140,6 @@ class MainMenu:
         s = self._f_sub.render(sub, True, C_TEXT)
         self.screen.blit(s, s.get_rect(center=(WIDTH//2, 120)))
 
-        # Input box for steps
         if self.state == _S_STEPS:
             pygame.draw.rect(self.screen, C_INPUT_BG,    self.input_rect, border_radius=6)
             pygame.draw.rect(self.screen, C_INPUT_BORDER, self.input_rect, 2, border_radius=6)
@@ -176,8 +156,6 @@ class MainMenu:
         if self.note:
             n = self._f_sm.render(self.note, True, C_NOTE)
             self.screen.blit(n, n.get_rect(center=(WIDTH//2, 480)))
-
-    # ── Run ──────────────────────────────────────────────────────────────────
 
     def run(self):
         clock = pygame.time.Clock()
