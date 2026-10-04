@@ -57,7 +57,6 @@ class _BoardView2:
         br, bc = state.agent_b_pos
         draw_agent_b(surf, (bc*CELL+CELL//2, br*CELL+CELL//2), CELL)
 
-
 class TwoAgentApp:
     def __init__(self, screen: pygame.Surface, map_path: str, n_steps: int, fps: int = 5):
         self.screen   = screen
@@ -92,13 +91,23 @@ class TwoAgentApp:
         t_a, t_b = 0.0, 0.0
         clock   = pygame.time.Clock()
 
+        history = [state]
+        history_times = [(t_a, t_b)]
+        history_index = 0
+
         btn_back    = Button((MRG, 18,  PANEL - 2*MRG, 36), "← Menu",   self._f_btn)
         btn_toggle  = Button((MRG, 315, PANEL - 2*MRG, 40), "START",   self._f_btn)
         btn_step    = Button((MRG, 365, PANEL - 2*MRG, 40), "STEP",    self._f_btn)
         btn_restart = Button((MRG, 415, PANEL - 2*MRG, 40), "RESTART", self._f_btn)
 
         def do_step():
-            nonlocal state, t_a, t_b
+            nonlocal state, t_a, t_b, history_index
+            if history_index < len(history) - 1:
+                history_index += 1
+                state = history[history_index]
+                t_a, t_b = history_times[history_index]
+                return
+
             if prob.is_terminal(state):
                 return
             pre = state
@@ -112,14 +121,31 @@ class TwoAgentApp:
             t_b = (time.perf_counter() - t0) * 1000
 
             state = prob.transition_model(pre, a_a, a_b)
+            history.append(state)
+            history_times.append((t_a, t_b))
+            history_index += 1
 
         running = True
         while running:
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT: running = False
                 if ev.type == pygame.KEYDOWN:
-                    if ev.key == pygame.K_SPACE:  paused = not paused
-                    elif ev.key == pygame.K_ESCAPE: running = False
+                    if ev.key == pygame.K_SPACE:
+                        paused = not paused
+                    elif ev.key == pygame.K_LEFT:
+                        paused = True
+                        if history_index > 0:
+                            history_index -= 1
+                            state = history[history_index]
+                            t_a, t_b = history_times[history_index]
+                    elif ev.key == pygame.K_RIGHT:
+                        paused = True
+                        if history_index < len(history) - 1:
+                            history_index += 1
+                            state = history[history_index]
+                            t_a, t_b = history_times[history_index]
+                    elif ev.key == pygame.K_ESCAPE:
+                        running = False
                 if btn_back.handle_event(ev):    running = False
                 if btn_toggle.handle_event(ev):  paused = not paused
                 if btn_step.handle_event(ev):
@@ -131,6 +157,9 @@ class TwoAgentApp:
                     bsurf = pygame.Surface((view.width, view.height))
                     t_a = t_b = 0.0
                     paused = True
+                    history = [state]
+                    history_times = [(t_a, t_b)]
+                    history_index = 0
 
             if not paused and not prob.is_terminal(state):
                 do_step()
@@ -141,6 +170,9 @@ class TwoAgentApp:
             btn_toggle.text = "PAUSE" if not paused else "START"
             for btn in (btn_back, btn_toggle, btn_step, btn_restart):
                 btn.draw(self.screen)
+
+            hint = self._f.render("SPACE: pause   <- / ->: history", True, C_INFO_TEXT)
+            self.screen.blit(hint, (MRG, 465))
 
             ip = pygame.Rect(MRG, 65, PANEL - 2*MRG, 235)
             pygame.draw.rect(self.screen, C_INFO_BG, ip, border_radius=8)
@@ -154,9 +186,10 @@ class TwoAgentApp:
             y += 6
             lbl("Agent A  (Doraemon)"); lbl(f"  Score : {state.score_a}"); lbl(f"  Time  : {t_a:.1f} ms")
             y += 6
-            lbl("Agent B  (Pink)");     lbl(f"  Score : {state.score_b}"); lbl(f"  Time  : {t_b:.1f} ms")
+            lbl("Agent B  (Doraemi)");     lbl(f"  Score : {state.score_b}"); lbl(f"  Time  : {t_b:.1f} ms")
             y += 6
             lbl(f"Steps left : {state.steps_left}", C_STATUS)
+            lbl(f"History    : {history_index}/{len(history) - 1}")
 
             bsurf.fill((255, 255, 255))
             view.draw(bsurf, state)
@@ -173,6 +206,5 @@ class TwoAgentApp:
                 rs = self._f.render(res, True, C_STATUS)
                 self.screen.blit(go, go.get_rect(center=(ov.centerx, ov.centery - 28)))
                 self.screen.blit(rs, rs.get_rect(center=(ov.centerx, ov.centery + 22)))
-
             pygame.display.flip()
             clock.tick(self.fps)
