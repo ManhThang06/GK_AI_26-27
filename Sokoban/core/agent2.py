@@ -32,9 +32,6 @@ class AgentAlgorithm2:
         self.max_stuck = 2; 
         self.box_blacklist = {}
 
-    def set_heuristic(self, heuristic):
-        self.heuristic = heuristic
-
     def clear_target(self):
         self.target_box = None; 
         self.target_goal = None

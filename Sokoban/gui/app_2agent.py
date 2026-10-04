@@ -4,7 +4,7 @@ from gui.widgets import (Button, make_bg, make_wall_tile, draw_box,
                          draw_doraemon, draw_agent_b,
                          C_INFO_BG, C_INFO_TEXT, C_STATUS,
                          C_FLOOR, C_GOAL_MARK, C_GOAL_MARK_DONE,
-                         C_BOX_FREE, C_BOX_A, C_BOX_B, C_OUTLINE)
+                         C_BOX_FREE, C_BOX_A, C_BOX_B)
 from core.map_parser  import MapParser
 from core.two_agent   import TwoAgentProblem
 from core.agent1 import AgentAlgorithm1

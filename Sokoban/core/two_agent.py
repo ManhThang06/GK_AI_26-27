@@ -56,9 +56,6 @@ class TwoAgentProblem:
     def is_terminal(self, state):
         return state.steps_left <= 0
 
-    def utility(self, state):
-        return state.score_a, state.score_b
-
     def _intent(self, agent_pos, action, boxes):
         dr, dc = _MOVE.get(action, (0, 0))
         next_pos = (agent_pos[0] + dr, agent_pos[1] + dc)
