@@ -106,32 +106,18 @@ class TwoAgentApp:
 
         def do_step():
             nonlocal state, t_a, t_b
-            if prob.is_terminal(state): return
+            if prob.is_terminal(state):
+                return
             pre = state
 
             t0 = time.perf_counter()
-            if agent_a.steal_mode:
-                a_a = agent_a.choose_steal_action(pre, prob)
-            else:
-                a_a = agent_a.choose_action(pre, prob)
-                if agent_a.target_box is None:
-                    steal_a = agent_a.choose_steal_action(pre, prob)
-                    if steal_a != "Wait":
-                        a_a = steal_a
+            a_a = agent_a.choose_action(pre, prob)
             t_a = (time.perf_counter() - t0) * 1000
 
             t0 = time.perf_counter()
-            if agent_b.steal_mode:
-                a_b = agent_b.choose_steal_action(pre, prob)
-            else:
-                a_b = agent_b.choose_action(pre, prob)
-                if agent_b.target_box is None:
-                    steal_b = agent_b.choose_steal_action(pre, prob)
-                    if steal_b != "Wait":
-                        a_b = steal_b
+            a_b = agent_b.choose_action(pre, prob)
             t_b = (time.perf_counter() - t0) * 1000
 
-            # Ca hai action deu duoc chon tu cung pre-state.
             state = prob.transition_model(pre, a_a, a_b)
 
         running = True

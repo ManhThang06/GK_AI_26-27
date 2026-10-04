@@ -4,7 +4,6 @@ Các thành phần UI dùng chung: Button, nền cỏ, vẽ agent Doraemon & Age
 """
 import pygame
 
-# ── Màu sắc ──────────────────────────────────────────────────────────────────
 C_BG             = (210, 185, 155)
 C_OUTLINE        = (30,  30,  30)
 C_BTN            = (222, 115, 38)
@@ -44,8 +43,6 @@ C_NOTE           = (180, 40,  40)
 C_INPUT_BG       = (255, 255, 220)
 C_INPUT_BORDER   = (100, 80,  40)
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def make_bg(width: int, height: int) -> pygame.Surface:
     surf = pygame.Surface((width, height))
@@ -112,8 +109,6 @@ def shadow_text(screen, font, text: str, pos: tuple):
     screen.blit(font.render(text, True, C_SHADOW), (pos[0] + 2, pos[1] + 2))
     screen.blit(font.render(text, True, C_TEXT), pos)
 
-
-# ── Button ───────────────────────────────────────────────────────────────────
 
 class Button:
     def __init__(self, rect, text: str, font):
