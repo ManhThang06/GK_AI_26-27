@@ -21,7 +21,6 @@ PANEL = 220
 MRG   = 20
 MIN_H = 500
 
-
 class _BoardView2:
     def __init__(self, problem):
         self.problem = problem
