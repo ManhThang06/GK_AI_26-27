@@ -6,7 +6,7 @@ class AgentAlgorithm1:
 
     def __init__(self, heuristic=None, time_limit=1.0):
         self.heuristic = heuristic
-        self.time_limit = min(time_limit, 0.95)
+        self.time_limit = time_limit
         self.target_box = None
         self.target_goal = None
         self.previous_boxes = None
@@ -19,7 +19,7 @@ class AgentAlgorithm1:
         self.target_box = None
         self.target_goal = None
 
-    def select_target(self, agent_pos, boxes, problem, opponent, deadline=None):
+    def select_target(self, agent_pos, boxes, problem, opponent, opponent_boxes):
         occupied_goals = set(boxes) & set(problem.goals)
         free_goals = set(problem.goals) - occupied_goals
         best_box = None
@@ -27,14 +27,12 @@ class AgentAlgorithm1:
         best_priority = (float("inf"), float("inf"), float("inf"))
 
         for box in boxes:
-            if deadline is not None and time.perf_counter() >= deadline:
-                return
             if box in occupied_goals:
+                continue
+            if box in opponent_boxes:
                 continue
 
             for goal in free_goals:
-                if deadline is not None and time.perf_counter() >= deadline:
-                    return
                 if box not in self.heuristic.maze_dist[goal]:
                     continue
                 goal_distance = self.heuristic.maze_dist[goal][box]
@@ -47,8 +45,6 @@ class AgentAlgorithm1:
                 best_agent_distance = float("inf")
 
                 for dr, dc in directions:
-                    if deadline is not None and time.perf_counter() >= deadline:
-                        return
                     push_pos = (box[0] - dr, box[1] - dc)
                     box_next = (box[0] + dr, box[1] + dc)
 
@@ -67,14 +63,14 @@ class AgentAlgorithm1:
 
                     blocked = set(boxes)
                     blocked.add(opponent)
-                    agent_distance = self.bfs_distance(agent_pos, push_pos, problem.walls, blocked, deadline)
+                    agent_distance = self.bfs_distance(agent_pos, push_pos, problem.walls, blocked)
                     if agent_distance < best_agent_distance:
                         best_agent_distance = agent_distance
 
                 if best_agent_distance == float("inf"):
                     continue
-                home_distance = self.bfs_distance(self.home_position, box, problem.walls, set(), deadline)
-                priority = (goal_distance, home_distance, best_agent_distance)
+                home_distance = self.bfs_distance(self.home_position, box, problem.walls, set())
+                priority = (best_agent_distance, goal_distance, home_distance)
                 if priority < best_priority:
                     best_priority = priority
                     best_box = box
@@ -94,14 +90,25 @@ class AgentAlgorithm1:
         current_boxes = set(boxes)
 
         if self.target_box not in current_boxes:
+            old_target = self.target_box
             new_positions = current_boxes - old_boxes
-            if len(new_positions) == 1:
-                self.target_box = next(iter(new_positions))
+
+            possible_positions = {
+                (old_target[0] - 1, old_target[1]),
+                (old_target[0] + 1, old_target[1]),
+                (old_target[0], old_target[1] - 1),
+                (old_target[0], old_target[1] + 1)
+            }
+
+            moved_positions = new_positions & possible_positions
+
+            if len(moved_positions) == 1:
+                self.target_box = next(iter(moved_positions))
             else:
                 self.clear_target()
 
         self.previous_boxes = current_boxes
-    def bfs_distance(self, start, target, walls, blocked, deadline=None):
+    def bfs_distance(self, start, target, walls, blocked):
         if start == target:
             return 0
         queue = [(start, 0)]
@@ -113,8 +120,6 @@ class AgentAlgorithm1:
             (0, 1)
         ]
         while queue:
-            if deadline is not None and time.perf_counter() >= deadline:
-                return float("inf")
             current, distance = queue.pop(0)
             for dr, dc in directions:
                 next_pos = (current[0] + dr, current[1] + dc)
@@ -131,7 +136,7 @@ class AgentAlgorithm1:
 
         return float("inf")
 
-    def can_continue_push(self, agent_pos, box_pos, boxes, problem, opponent, deadline=None):
+    def can_continue_push(self, agent_pos, box_pos, boxes, problem, opponent):
         directions = [
             (-1, 0),
             (1, 0),
@@ -140,8 +145,6 @@ class AgentAlgorithm1:
         ]
 
         for dr, dc in directions:
-            if deadline is not None and time.perf_counter() >= deadline:
-                return False
             push_pos = (box_pos[0] - dr, box_pos[1] - dc)
             next_box = (box_pos[0] + dr, box_pos[1] + dc)
 
@@ -159,12 +162,12 @@ class AgentAlgorithm1:
                 continue
             blocked = set(boxes)
             blocked.add(opponent)
-            distance = self.bfs_distance(agent_pos, push_pos, problem.walls, blocked, deadline)
+            distance = self.bfs_distance(agent_pos, push_pos, problem.walls, blocked)
             if distance != float("inf"):
                 return True
         return False
 
-    def get_push_distance(self, agent_pos, boxes, problem, opponent, target_box, deadline=None):
+    def get_push_distance(self, agent_pos, boxes, problem, opponent, target_box):
         min_distance = (float("inf"), float("inf"), float("inf"))
         occupied_goals = set(boxes) & set(problem.goals)
         free_goals = set(problem.goals) - occupied_goals
@@ -178,8 +181,6 @@ class AgentAlgorithm1:
         ]
 
         for box in boxes:
-            if deadline is not None and time.perf_counter() >= deadline:
-                return min_distance
             if box in occupied_goals:
                 continue
             if target_box is not None:
@@ -187,8 +188,6 @@ class AgentAlgorithm1:
                     continue
             br, bc = box
             for dr, dc in directions:
-                if deadline is not None and time.perf_counter() >= deadline:
-                    return min_distance
                 push_pos = (br - dr, bc - dc)
                 box_next = (br + dr, bc + dc)
                 if push_pos in problem.walls:
@@ -204,7 +203,7 @@ class AgentAlgorithm1:
                 after_boxes.remove(box)
                 after_boxes.add(box_next)
                 if box_next != self.target_goal:
-                    if not self.can_continue_push(box, box_next, after_boxes, problem, opponent, deadline):
+                    if not self.can_continue_push(box, box_next, after_boxes, problem, opponent):
                         continue
 
                 goal = self.target_goal
@@ -220,7 +219,7 @@ class AgentAlgorithm1:
                     continue
                 blocked = set(boxes)
                 blocked.add(opponent)
-                distance = self.bfs_distance(agent_pos, push_pos, problem.walls, blocked, deadline)
+                distance = self.bfs_distance(agent_pos, push_pos, problem.walls, blocked)
                 if distance == float("inf"):
                     continue
                 if box not in self.heuristic.maze_dist[goal]:
@@ -245,7 +244,17 @@ class AgentAlgorithm1:
             self.home_position = state.agent_a_pos
 
         opponent = state.agent_b_pos
+        box_owner = dict(state.box_owner)
+        opponent_boxes = set()
+
+        for box, owner in box_owner.items():
+            if owner == "B":
+                opponent_boxes.add(box)
+
         self.update_target_box(state.boxes)
+
+        if self.target_box in opponent_boxes:
+            self.clear_target()
 
         if self.target_box is not None:
             if self.target_box not in state.boxes:
@@ -260,17 +269,13 @@ class AgentAlgorithm1:
                 if self.target_box != self.target_goal:
                     self.clear_target()
         if self.target_box is None or self.target_goal is None:
-            self.select_target(state.agent_a_pos, state.boxes, problem, opponent, deadline)
+            self.select_target(state.agent_a_pos, state.boxes, problem, opponent, opponent_boxes)
         start = (state.agent_a_pos, state.boxes, self.target_box)
-        if time.perf_counter() >= deadline:
-            return "Wait"
         current_h = self.heuristic.evaluate(state.boxes)
-        if time.perf_counter() >= deadline:
-            return "Wait"
         frontier = []
         count = 0
 
-        start_push_distance = self.get_push_distance(state.agent_a_pos, state.boxes, problem, opponent, self.target_box, deadline)
+        start_push_distance = self.get_push_distance(state.agent_a_pos, state.boxes, problem, opponent, self.target_box)
         heapq.heappush(frontier, (current_h, start_push_distance, count, state.agent_a_pos, state.boxes, self.target_box))
         frontier_h = {start: current_h}
         explored = set()
@@ -326,6 +331,9 @@ class AgentAlgorithm1:
                 if next_agent in boxes:
                     if action == "Wait":
                         continue
+                    if target_box is not None:
+                        if next_agent != target_box:
+                            continue
                     next_box = (next_agent[0] + dr, next_agent[1] + dc)
                     if (next_box in problem.walls or next_box in boxes or next_box == opponent):
                         continue
@@ -348,14 +356,8 @@ class AgentAlgorithm1:
                     continue
                 if next_state in frontier_h:
                     continue
-                if time.perf_counter() >= deadline:
-                    break
                 next_h = self.heuristic.evaluate(next_boxes)
-                if time.perf_counter() >= deadline:
-                    break
-                next_push_distance = self.get_push_distance(next_agent, next_boxes, problem, opponent, next_target_box, deadline)
-                if time.perf_counter() >= deadline:
-                    break
+                next_push_distance = self.get_push_distance(next_agent, next_boxes, problem, opponent, next_target_box)
                 parent[next_state] = current
                 parent_action[next_state] = action
                 count += 1
