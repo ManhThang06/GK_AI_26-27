@@ -131,7 +131,13 @@ class TwoAgentApp:
                 if btn_step.handle_event(ev):
                     if paused and not prob.is_terminal(state): do_step()
                 if btn_restart.handle_event(ev):
-                    state = prob.initial_state; t_a = t_b = 0.0; paused = True
+                    # Tao lai toan bo game de xoa trang thai cu cua 2 agent.
+                    prob, agent_a, agent_b = self._build()
+                    state = prob.initial_state
+                    view = _BoardView2(prob)
+                    bsurf = pygame.Surface((view.width, view.height))
+                    t_a = t_b = 0.0
+                    paused = True
 
             if not paused and not prob.is_terminal(state):
                 do_step()

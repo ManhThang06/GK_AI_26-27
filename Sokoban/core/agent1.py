@@ -11,6 +11,28 @@ class AgentAlgorithm1:
         self.target_goal = None
         self.previous_boxes = None
         self.home_position = None
+        self.steal_goal = None
+        self.steal_box = None
+        self.my_completed_goals = set()
+        self.previous_score = 0
+        self.lost_goal = None
+        self.bad_pairs = set()
+        self.bad_pairs_boxes = None
+        self.plan_timeout = False
+        self.target_from_opponent = False
+        self.yield_to_opponent = False
+        self.yield_count = 0
+        self.max_yield = 1
+        self.turn = 0
+        self.wait_streak = 0
+        self.max_wait = 4
+        self.steal_blacklist = {}
+        self.lost_steal_count = 0
+        self.last_pos = None
+        self.last_action = None
+        self.stuck_count = 0
+        self.max_stuck = 6
+        self.box_blacklist = {}
 
     def set_heuristic(self, heuristic):
         self.heuristic = heuristic
@@ -18,8 +40,29 @@ class AgentAlgorithm1:
     def clear_target(self):
         self.target_box = None
         self.target_goal = None
+        self.target_from_opponent = False
 
-    def select_target(self, agent_pos, boxes, problem, opponent, opponent_boxes):
+    def next_cell(self, pos, action):
+        moves = {
+            "North": (-1, 0),
+            "South": (1, 0),
+            "West": (0, -1),
+            "East": (0, 1),
+            "Wait": (0, 0)
+        }
+        dr, dc = moves[action]
+        return (pos[0] + dr, pos[1] + dc)
+
+    def is_corner_deadlock(self, pos, problem):
+        r, c = pos
+        up = (r - 1, c) in problem.walls
+        down = (r + 1, c) in problem.walls
+        left = (r, c - 1) in problem.walls
+        right = (r, c + 1) in problem.walls
+        return (up and left) or (up and right) or (down and left) or (down and right)
+
+    def select_target(self, agent_pos, boxes, problem, opponent, opponent_boxes, allow_opponent_boxes=False):
+        self.target_from_opponent = False
         occupied_goals = set(boxes) & set(problem.goals)
         free_goals = set(problem.goals) - occupied_goals
         best_box = None
@@ -29,10 +72,14 @@ class AgentAlgorithm1:
         for box in boxes:
             if box in occupied_goals:
                 continue
-            if box in opponent_boxes:
+            if box in opponent_boxes and not allow_opponent_boxes:
+                continue
+            if self.box_blacklist.get(box, -1) > self.turn:
                 continue
 
             for goal in free_goals:
+                if (box, goal) in self.bad_pairs:
+                    continue
                 if box not in self.heuristic.maze_dist[goal]:
                     continue
                 goal_distance = self.heuristic.maze_dist[goal][box]
@@ -70,13 +117,36 @@ class AgentAlgorithm1:
                 if best_agent_distance == float("inf"):
                     continue
                 home_distance = self.bfs_distance(self.home_position, box, problem.walls, set())
-                priority = (best_agent_distance, goal_distance, home_distance)
+                total_distance = best_agent_distance + goal_distance
+                priority = (total_distance, goal_distance, home_distance)
                 if priority < best_priority:
                     best_priority = priority
                     best_box = box
                     best_goal = goal
         self.target_box = best_box
         self.target_goal = best_goal
+
+    def choose_goal_for_box(self, box, boxes, problem):
+        occupied_goals = set(boxes) & set(problem.goals)
+        best_goal = None
+        best_distance = float("inf")
+
+        for goal in problem.goals:
+            if goal in occupied_goals:
+                continue
+            if (box, goal) in self.bad_pairs:
+                continue
+            if box not in self.heuristic.maze_dist[goal]:
+                continue
+            goal_distance = self.heuristic.maze_dist[goal][box]
+            if goal_distance < best_distance:
+                best_distance = goal_distance
+                best_goal = goal
+
+        if best_goal is None:
+            self.clear_target()
+        else:
+            self.target_goal = best_goal
 
     def update_target_box(self, boxes):
         if self.target_box is None:
@@ -108,6 +178,7 @@ class AgentAlgorithm1:
                 self.clear_target()
 
         self.previous_boxes = current_boxes
+
     def bfs_distance(self, start, target, walls, blocked):
         if start == target:
             return 0
@@ -136,114 +207,596 @@ class AgentAlgorithm1:
 
         return float("inf")
 
-    def can_continue_push(self, agent_pos, box_pos, boxes, problem, opponent):
+    def bfs_first_action(self, start, target, walls, blocked, deadline):
+        if start == target:
+            return "Wait"
+
         directions = [
-            (-1, 0),
-            (1, 0),
-            (0, -1),
-            (0, 1)
+            ("North", -1, 0), ("South", 1, 0),
+            ("West", 0, -1), ("East", 0, 1)
+        ]
+        queue = [(start, None)]
+        explored = {start}
+
+        while queue:
+            if time.perf_counter() >= deadline:
+                return None
+
+            current, first = queue.pop(0)
+
+            for action, dr, dc in directions:
+                next_pos = (current[0] + dr, current[1] + dc)
+
+                if next_pos in explored:
+                    continue
+                if next_pos in walls:
+                    continue
+                if next_pos in blocked:
+                    continue
+
+                first_action = action if first is None else first
+
+                if next_pos == target:
+                    return first_action
+
+                explored.add(next_pos)
+                queue.append((next_pos, first_action))
+
+        return None
+
+    def plan_box_to_goal(self, agent_start, box, goal, other_boxes, problem, opponent, deadline, forbidden_first=None):
+        if box == goal:
+            return ("Wait", 0)
+        if goal not in self.heuristic.maze_dist:
+            return None
+        goal_map = self.heuristic.maze_dist[goal]
+        if box not in goal_map:
+            return None
+
+        directions = [
+            ("North", -1, 0), ("South", 1, 0),
+            ("West", 0, -1), ("East", 0, 1)
         ]
 
-        for dr, dc in directions:
-            push_pos = (box_pos[0] - dr, box_pos[1] - dc)
-            next_box = (box_pos[0] + dr, box_pos[1] + dc)
+        start = (agent_start, box)
+        count = 0
+        frontier = [(goal_map[box], 0, count, agent_start, box, None)]
+        best_cost = {start: 0}
 
-            if push_pos in problem.walls:
+        while frontier:
+            if time.perf_counter() >= deadline:
+                self.plan_timeout = True
+                return None
+
+            f, cost, _, agent_pos, box_pos, first_action = heapq.heappop(frontier)
+
+            if cost > best_cost.get((agent_pos, box_pos), float("inf")):
                 continue
-            if push_pos in boxes:
+
+            if box_pos == goal:
+                return (first_action, cost)
+
+            for action, dr, dc in directions:
+                next_agent = (agent_pos[0] + dr, agent_pos[1] + dc)
+                next_box = box_pos
+
+                if next_agent in problem.walls or next_agent in other_boxes:
+                    continue
+                if next_agent == opponent:
+                    continue
+                if cost == 0 and forbidden_first is not None:
+                    if next_agent in forbidden_first:
+                        continue
+
+                if next_agent == box_pos:
+                    pushed_box = (box_pos[0] + dr, box_pos[1] + dc)
+
+                    if pushed_box in problem.walls:
+                        continue
+                    if pushed_box in other_boxes:
+                        continue
+                    if pushed_box == opponent:
+                        continue
+                    if pushed_box not in goal_map:
+                        continue
+                    if pushed_box != goal and self.is_corner_deadlock(pushed_box, problem):
+                        continue
+
+                    next_box = pushed_box
+
+                next_state = (next_agent, next_box)
+                next_cost = cost + 1
+
+                if next_cost >= best_cost.get(next_state, float("inf")):
+                    continue
+
+                best_cost[next_state] = next_cost
+                next_first = action if first_action is None else first_action
+
+                count += 1
+                heapq.heappush(
+                    frontier,
+                    (next_cost + goal_map[next_box], next_cost, count, next_agent, next_box, next_first)
+                )
+
+        return None
+
+    def plan_stolen_box_to_goal(self, state, problem, box, goal, deadline):
+        agent_start = state.agent_a_pos
+        opponent = state.agent_b_pos
+        other_boxes = set(state.boxes)
+        other_boxes.discard(box)
+
+        result = self.plan_box_to_goal(
+            agent_start, box, goal, other_boxes, problem, opponent, deadline
+        )
+
+        if result is None:
+            result = self.plan_box_to_goal(
+                agent_start, box, goal, other_boxes, problem, None, deadline
+            )
+            if result is None:
+                return None
+            if self.next_cell(agent_start, result[0]) == opponent:
+                return "Wait"
+
+        return result[0]
+
+    def can_finish_steal(self, state, problem, goal, push_action, dr, dc, deadline):
+        agent_pos = state.agent_a_pos
+        opponent = state.agent_b_pos
+
+        push_pos = (goal[0] - dr, goal[1] - dc)
+        box_out = (goal[0] + dr, goal[1] + dc)
+
+        if push_pos in problem.walls or push_pos in state.boxes:
+            return None
+        if box_out in problem.walls or box_out in state.boxes:
+            return None
+
+        blocked = set(state.boxes)
+        blocked.add(opponent)
+
+        first_action = self.bfs_first_action(
+            agent_pos, push_pos, problem.walls, blocked, deadline
+        )
+        if first_action is None:
+            # Opponent chi tam thoi chan duong: khong bo box nay, di tiep bo qua opponent
+            blocked = set(state.boxes)
+            first_action = self.bfs_first_action(
+                agent_pos, push_pos, problem.walls, blocked, deadline
+            )
+            if first_action is None:
+                return None
+
+        class TempState:
+            pass
+
+        temp = TempState()
+        temp.agent_a_pos = goal
+        temp.agent_b_pos = opponent
+
+        new_boxes = set(state.boxes)
+        new_boxes.remove(goal)
+        new_boxes.add(box_out)
+        temp.boxes = frozenset(new_boxes)
+
+        return_action = self.plan_stolen_box_to_goal(
+            temp, problem, box_out, goal, deadline
+        )
+
+        if return_action is None:
+            return None
+
+        distance = self.bfs_distance(
+            agent_pos, push_pos, problem.walls, blocked
+        )
+
+        if push_pos == opponent or box_out == opponent:
+            distance += 100
+
+        return (distance, push_pos, push_action, first_action)
+
+    def choose_steal_action(self, state, problem, deadline, preferred_goals=None):
+        agent_pos = state.agent_a_pos
+        opponent = state.agent_b_pos
+        owners = dict(state.box_owner)
+
+        directions = [
+            ("North", -1, 0), ("South", 1, 0),
+            ("West", 0, -1), ("East", 0, 1)
+        ]
+
+        # Dang trong mot lan cuop.
+        if self.steal_goal is not None:
+            goal = self.steal_goal
+
+            if goal in state.boxes and owners.get(goal) == "A":
+                if self.lost_goal == goal:
+                    self.lost_goal = None
+                self.steal_goal = None
+                self.steal_box = None
+                self.clear_target()
+                return None
+
+            if goal in state.boxes and owners.get(goal) == "B":
+                best = None
+
+                for push_action, dr, dc in directions:
+                    if time.perf_counter() >= deadline:
+                        break
+
+                    candidate = self.can_finish_steal(
+                        state, problem, goal,
+                        push_action, dr, dc, deadline
+                    )
+
+                    if candidate is None:
+                        continue
+
+                    if best is None or candidate[0] < best[0]:
+                        best = candidate
+
+                if best is None:
+                    failed_goal = goal
+                    self.steal_goal = None
+                    self.steal_box = None
+                    self.clear_target()
+
+                    other_goals = {
+                        box for box in state.boxes
+                        if box in problem.goals
+                        and owners.get(box) == "B"
+                        and box != failed_goal
+                    }
+
+                    if other_goals:
+                        return self.choose_steal_action(
+                            state, problem, deadline, other_goals
+                        )
+
+                    return None
+
+                _, push_pos, push_action, first_action = best
+
+                if agent_pos == push_pos:
+                    dr, dc = dict(
+                        (a, (r, c)) for a, r, c in directions
+                    )[push_action]
+                    if (goal[0] + dr, goal[1] + dc) == opponent:
+                        return "Wait"
+                    self.steal_box = (goal[0] + dr, goal[1] + dc)
+                    return push_action
+
+                return first_action
+
+            stolen_box = None
+
+            if self.target_box in state.boxes and owners.get(self.target_box) == "A":
+                stolen_box = self.target_box
+            elif self.steal_box in state.boxes and owners.get(self.steal_box) == "A":
+                stolen_box = self.steal_box
+            else:
+                for _, dr, dc in directions:
+                    box = (goal[0] + dr, goal[1] + dc)
+                    if box in state.boxes and owners.get(box) == "A":
+                        stolen_box = box
+                        break
+
+            if stolen_box is not None:
+                self.lost_steal_count = 0
+                self.steal_box = stolen_box
+                self.target_box = stolen_box
+                self.target_goal = goal
+
+                plan_action = self.plan_stolen_box_to_goal(
+                    state, problem, stolen_box, goal, deadline
+                )
+
+                if plan_action is not None:
+                    return plan_action
+                return "Wait"
+
+            self.lost_steal_count += 1
+            if self.lost_steal_count >= 3:
+                self.steal_goal = None
+                self.steal_box = None
+                self.lost_steal_count = 0
+                self.clear_target()
+                return None
+            return "Wait"
+
+        best = None
+
+        for box in state.boxes:
+            if time.perf_counter() >= deadline:
+                break
+            if box not in problem.goals:
+                continue
+            if owners.get(box) != "B":
+                continue
+            if preferred_goals is not None and box not in preferred_goals:
+                continue
+            if self.steal_blacklist.get(box, -1) > self.turn:
+                continue
+
+            for push_action, dr, dc in directions:
+                if time.perf_counter() >= deadline:
+                    break
+
+                candidate = self.can_finish_steal(
+                    state, problem, box,
+                    push_action, dr, dc, deadline
+                )
+
+                if candidate is None:
+                    continue
+
+                distance, push_pos, chosen_push, first_action = candidate
+                item = (
+                    distance, box, push_pos,
+                    chosen_push, first_action
+                )
+
+                if best is None or item[0] < best[0]:
+                    best = item
+
+        if best is None:
+            return None
+
+        _, goal, push_pos, push_action, first_action = best
+        self.steal_goal = goal
+        self.steal_box = None
+        self.clear_target()
+
+        if agent_pos == push_pos:
+            dr, dc = dict(
+                (a, (r, c)) for a, r, c in directions
+            )[push_action]
+            if (goal[0] + dr, goal[1] + dc) == opponent:
+                return "Wait"
+            self.steal_box = (goal[0] + dr, goal[1] + dc)
+            return push_action
+
+        return first_action
+
+    def greedy_push_action(self, state, problem, deadline):
+        agent_pos = state.agent_a_pos
+        opponent = state.agent_b_pos
+        box = self.target_box
+        goal_map = self.heuristic.maze_dist[self.target_goal]
+
+        directions = [
+            ("North", -1, 0), ("South", 1, 0),
+            ("West", 0, -1), ("East", 0, 1)
+        ]
+        best = None
+
+        for push_action, dr, dc in directions:
+            push_pos = (box[0] - dr, box[1] - dc)
+            box_next = (box[0] + dr, box[1] + dc)
+
+            if push_pos in problem.walls or push_pos in state.boxes:
                 continue
             if push_pos == opponent:
                 continue
-            if next_box in problem.walls:
+            if box_next in problem.walls or box_next in state.boxes:
                 continue
-            if next_box in boxes:
+            if box_next == opponent:
                 continue
-            if next_box == opponent:
+            if box_next not in goal_map:
                 continue
-            blocked = set(boxes)
-            blocked.add(opponent)
-            distance = self.bfs_distance(agent_pos, push_pos, problem.walls, blocked)
-            if distance != float("inf"):
-                return True
-        return False
 
-    def get_push_distance(self, agent_pos, boxes, problem, opponent, target_box):
-        min_distance = (float("inf"), float("inf"), float("inf"))
-        occupied_goals = set(boxes) & set(problem.goals)
-        free_goals = set(problem.goals) - occupied_goals
-        if not free_goals:
-            return (0, 0, 0)
-        directions = [
-            (-1, 0),
-            (1, 0),
-            (0, -1),
-            (0, 1)
-        ]
-
-        for box in boxes:
-            if box in occupied_goals:
-                continue
-            if target_box is not None:
-                if box != target_box:
-                    continue
-            br, bc = box
-            for dr, dc in directions:
-                push_pos = (br - dr, bc - dc)
-                box_next = (br + dr, bc + dc)
-                if push_pos in problem.walls:
-                    continue
-                if push_pos in boxes:
-                    continue
-                if box_next in problem.walls:
-                    continue
-                if box_next in boxes:
-                    continue
-
-                after_boxes = set(boxes)
-                after_boxes.remove(box)
-                after_boxes.add(box_next)
-                if box_next != self.target_goal:
-                    if not self.can_continue_push(box, box_next, after_boxes, problem, opponent):
-                        continue
-
-                goal = self.target_goal
-                if goal is None:
-                    continue
-                if goal not in free_goals:
-                    continue
-                if box_next not in self.heuristic.maze_dist[goal]:
-                    continue
-                goal_distance = self.heuristic.maze_dist[goal][box_next]
-
-                if goal_distance == float("inf"):
-                    continue
-                blocked = set(boxes)
+            if agent_pos == push_pos:
+                distance = 0
+                first_action = push_action
+            else:
+                blocked = set(state.boxes)
                 blocked.add(opponent)
-                distance = self.bfs_distance(agent_pos, push_pos, problem.walls, blocked)
-                if distance == float("inf"):
+                first_action = self.bfs_first_action(
+                    agent_pos, push_pos, problem.walls, blocked, deadline
+                )
+                if first_action is None:
                     continue
-                if box not in self.heuristic.maze_dist[goal]:
-                    continue
+                distance = self.bfs_distance(
+                    agent_pos, push_pos, problem.walls, blocked
+                )
 
-                before_distance = self.heuristic.maze_dist[goal][box]
-                if goal_distance < before_distance:
-                    progress = 0
-                elif goal_distance == before_distance:
-                    progress = 1
-                else:
-                    progress = 2
-                push_priority = (progress, goal_distance, distance)
-                min_distance = min(min_distance, push_priority)
-        return min_distance
-    
+            item = (goal_map[box_next], distance, first_action)
+            if best is None or item[:2] < best[:2]:
+                best = item
+
+        if best is None:
+            return "Wait"
+        return best[2]
+
+    def choose_push_action(self, state, problem, deadline):
+        # Day box target_box ve target_goal theo duong ngan nhat.
+        agent_pos = state.agent_a_pos
+        opponent = state.agent_b_pos
+        other_boxes = set(state.boxes)
+        other_boxes.discard(self.target_box)
+
+        remain = deadline - time.perf_counter()
+        plan_deadline = time.perf_counter() + remain * 0.7
+        self.plan_timeout = False
+
+        best = self.plan_box_to_goal(
+            agent_pos, self.target_box, self.target_goal,
+            other_boxes, problem, opponent, plan_deadline
+        )
+
+        if best is None and self.plan_timeout:
+            return self.greedy_push_action(state, problem, deadline)
+
+        if best is None:
+            best = self.plan_box_to_goal(
+                agent_pos, self.target_box, self.target_goal,
+                other_boxes, problem, None, plan_deadline
+            )
+            if best is not None:
+                if self.next_cell(agent_pos, best[0]) == opponent:
+                    return "Wait"
+                return best[0]
+
+            if self.plan_timeout:
+                return self.greedy_push_action(state, problem, deadline)
+
+            self.bad_pairs.add((self.target_box, self.target_goal))
+            self.bad_pairs_boxes = frozenset(state.boxes)
+            return None
+
+        action = best[0]
+
+        # Buoc ke tiep nam canh opponent -> tim duong khac, chi chap nhan lech toi da 1 buoc
+        next_pos = self.next_cell(agent_pos, action)
+        if abs(next_pos[0] - opponent[0]) + abs(next_pos[1] - opponent[1]) <= 1:
+            danger = {
+                opponent,
+                (opponent[0] - 1, opponent[1]),
+                (opponent[0] + 1, opponent[1]),
+                (opponent[0], opponent[1] - 1),
+                (opponent[0], opponent[1] + 1)
+            }
+            safe = self.plan_box_to_goal(
+                agent_pos, self.target_box, self.target_goal,
+                other_boxes, problem, opponent, plan_deadline, danger
+            )
+            if safe is not None and safe[1] <= best[1] + 1:
+                action = safe[0]
+
+        return action
+
+    def avoid_collision(self, action, state, problem):
+        agent_pos = state.agent_a_pos
+        opponent = state.agent_b_pos
+
+        if action is None or action == "Wait":
+            self.yield_count = 0
+            return "Wait"
+
+        next_pos = self.next_cell(agent_pos, action)
+
+        if next_pos == opponent:
+            return "Wait"
+
+        distance = abs(next_pos[0] - opponent[0]) + abs(next_pos[1] - opponent[1])
+        if distance > 1:
+            self.yield_count = 0
+            return action
+
+        if not self.yield_to_opponent:
+            return action
+
+        if self.yield_count >= self.max_yield:
+            self.yield_count = 0
+            return action
+
+        self.yield_count += 1
+        return "Wait"
+
     def choose_action(self, state, problem):
+        agent_pos = state.agent_a_pos
+
+        if self.last_action not in (None, "Wait") and self.last_pos == agent_pos:
+            self.stuck_count += 1
+        else:
+            self.stuck_count = 0
+
+        action = self.decide_action(state, problem)
+        action = self.avoid_collision(action, state, problem)
+        if action == "Wait":
+            self.wait_streak += 1
+        else:
+            self.wait_streak = 0
+
+        self.last_pos = agent_pos
+        self.last_action = action
+        return action
+
+    def decide_action(self, state, problem):
         deadline = time.perf_counter() + self.time_limit
         if self.heuristic is None:
             return "Wait"
         if self.home_position is None:
             self.home_position = state.agent_a_pos
 
+        owners = dict(state.box_owner)
         opponent = state.agent_b_pos
+        self.turn += 1
+
+        if self.steal_goal is not None and self.wait_streak >= self.max_wait:
+            if self.steal_goal in state.boxes and owners.get(self.steal_goal) == "B":
+                self.steal_blacklist[self.steal_goal] = self.turn + 15
+                self.steal_goal = None
+                self.steal_box = None
+                self.wait_streak = 0
+                self.clear_target()
+
+        if self.stuck_count >= self.max_stuck and self.steal_goal is None:
+            if self.target_box is not None:
+                self.box_blacklist[self.target_box] = self.turn + 15
+                self.clear_target()
+            self.stuck_count = 0
+
+        self.update_target_box(state.boxes)
+
+        if self.bad_pairs_boxes != frozenset(state.boxes):
+            self.bad_pairs = set()
+            self.bad_pairs_boxes = None
+
+        current_score = state.score_a
+
+        if current_score < self.previous_score:
+            for goal in self.my_completed_goals:
+                if goal in state.boxes and owners.get(goal) == "B":
+                    self.lost_goal = goal
+                    break
+
+        self.previous_score = current_score
+
+        for box in state.boxes:
+            if box in problem.goals and owners.get(box) == "A":
+                self.my_completed_goals.add(box)
+
+        no_target = self.target_box is None or self.target_goal is None
+
+        # Goal vua bi mat diem co uu tien cao nhat.
+        if self.lost_goal is not None and self.steal_goal is None and no_target:
+            if self.lost_goal in state.boxes and owners.get(self.lost_goal) == "A":
+                self.lost_goal = None
+            else:
+                revenge_action = self.choose_steal_action(
+                    state, problem, deadline, {self.lost_goal}
+                )
+
+                if revenge_action is not None:
+                    return revenge_action
+
+        lost_goals = []
+        for goal in self.my_completed_goals:
+            if goal in state.boxes and owners.get(goal) == "B":
+                lost_goals.append(goal)
+
+        if lost_goals and self.steal_goal is None and no_target:
+            revenge_action = self.choose_steal_action(
+                state, problem, deadline, set(lost_goals)
+            )
+
+            if revenge_action is not None:
+                return revenge_action
+
+        if self.steal_goal is not None:
+            steal_action = self.choose_steal_action(state, problem, deadline)
+            if steal_action is not None:
+                return steal_action
+
+        no_target = self.target_box is None or self.target_goal is None
+        if self.steal_goal is None and no_target:
+            steal_action = self.choose_steal_action(state, problem, deadline)
+            if steal_action is not None:
+                return steal_action
+
         box_owner = dict(state.box_owner)
         opponent_boxes = set()
 
@@ -251,10 +804,9 @@ class AgentAlgorithm1:
             if owner == "B":
                 opponent_boxes.add(box)
 
-        self.update_target_box(state.boxes)
-
         if self.target_box in opponent_boxes:
-            self.clear_target()
+            if self.steal_goal is None and not self.target_from_opponent:
+                self.clear_target()
 
         if self.target_box is not None:
             if self.target_box not in state.boxes:
@@ -262,110 +814,26 @@ class AgentAlgorithm1:
 
         if self.target_box is not None:
             if self.target_box in problem.goals:
-                self.clear_target()
+                if self.steal_goal is None:
+                    self.clear_target()
 
-        if self.target_goal is not None:
+        if self.target_box is not None and self.target_goal is not None:
             if self.target_goal in state.boxes:
                 if self.target_box != self.target_goal:
-                    self.clear_target()
-        if self.target_box is None or self.target_goal is None:
-            self.select_target(state.agent_a_pos, state.boxes, problem, opponent, opponent_boxes)
-        start = (state.agent_a_pos, state.boxes, self.target_box)
-        current_h = self.heuristic.evaluate(state.boxes)
-        frontier = []
-        count = 0
+                    self.choose_goal_for_box(self.target_box, state.boxes, problem)
 
-        start_push_distance = self.get_push_distance(state.agent_a_pos, state.boxes, problem, opponent, self.target_box)
-        heapq.heappush(frontier, (current_h, start_push_distance, count, state.agent_a_pos, state.boxes, self.target_box))
-        frontier_h = {start: current_h}
-        explored = set()
-        parent = {start: None}
-        parent_action = {start: None}
+        for _ in range(3):
+            if self.target_box is None or self.target_goal is None:
+                self.select_target(state.agent_a_pos, state.boxes, problem, opponent, opponent_boxes)
+            if self.target_box is None or self.target_goal is None:
+                self.select_target(state.agent_a_pos, state.boxes, problem, opponent, opponent_boxes, True)
+                if self.target_box is not None and self.target_goal is not None:
+                    self.target_from_opponent = True
+            if self.target_box is None or self.target_goal is None:
+                return "Wait"
 
-        directions = {
-            "North": (-1, 0),
-            "South": (1, 0),
-            "West": (0, -1),
-            "East": (0, 1),
-            "Wait": (0, 0)
-        }
-        best_state = start
-        best_h = current_h
-        best_push_distance = start_push_distance
-
-        while frontier:
-            if time.perf_counter() >= deadline:
-                break
-            h, push_distance, _, agent_pos, boxes, target_box = heapq.heappop(frontier)
-            current = (agent_pos, boxes, target_box)
-            if current in explored:
-                continue
-            frontier_h.pop(current, None)
-            explored.add(current)
-            if (
-                h < best_h
-                or (
-                    h == best_h
-                    and push_distance < best_push_distance
-                )
-            ):
-                best_h = h
-                best_push_distance = push_distance
-                best_state = current
-
-            if all(box in problem.goals for box in boxes):
-                best_state = current
-                break
-
-            for action in self.ACTIONS:
-                if time.perf_counter() >= deadline:
-                    break
-                dr, dc = directions[action]
-                next_agent = (agent_pos[0] + dr, agent_pos[1] + dc)
-                if next_agent == opponent:
-                    continue
-                if next_agent in problem.walls:
-                    continue
-                next_target_box = target_box
-                next_boxes = boxes
-                if next_agent in boxes:
-                    if action == "Wait":
-                        continue
-                    if target_box is not None:
-                        if next_agent != target_box:
-                            continue
-                    next_box = (next_agent[0] + dr, next_agent[1] + dc)
-                    if (next_box in problem.walls or next_box in boxes or next_box == opponent):
-                        continue
-                    if next_box not in problem.goals:
-                        r, c = next_box
-                        up = (r - 1, c) in problem.walls
-                        down = (r + 1, c) in problem.walls
-                        left = (r, c - 1) in problem.walls
-                        right = (r, c + 1) in problem.walls
-                        if ((up and left) or (up and right) or (down and left) or (down and right)):
-                            continue
-                    new_boxes = set(boxes)
-                    new_boxes.remove(next_agent)
-                    new_boxes.add(next_box)
-                    next_boxes = frozenset(new_boxes)
-                    if next_agent == target_box:
-                        next_target_box = next_box
-                next_state = (next_agent, next_boxes, next_target_box)
-                if next_state in explored:
-                    continue
-                if next_state in frontier_h:
-                    continue
-                next_h = self.heuristic.evaluate(next_boxes)
-                next_push_distance = self.get_push_distance(next_agent, next_boxes, problem, opponent, next_target_box)
-                parent[next_state] = current
-                parent_action[next_state] = action
-                count += 1
-                frontier_h[next_state] = next_h
-                heapq.heappush(frontier, (next_h, next_push_distance, count, next_agent, next_boxes, next_target_box))
-        if best_state == start:
-            return "Wait"
-        node = best_state
-        while parent[node] != start:
-            node = parent[node]
-        return parent_action[node]
+            push_action = self.choose_push_action(state, problem, deadline)
+            if push_action is not None:
+                return push_action
+            self.clear_target()
+        return "Wait"
