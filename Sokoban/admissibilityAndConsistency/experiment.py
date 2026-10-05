@@ -1,4 +1,12 @@
+import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.append(str(ROOT_DIR))
+
 import os
+
 from collections import deque
 from core.map_parser import MapParser
 from core.sokoban import SokobanProblem, ucs
